@@ -9,3 +9,7 @@ staticfiles/
 test-results/
 *.sqlite3
 .pytest_cache/
+docs/
+artifacts/
+*.md
+*.pdf

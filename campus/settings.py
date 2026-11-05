@@ -9,7 +9,7 @@ PRODUCTION = os.environ.get('APP_ENV') == 'production'
 DEBUG = os.environ.get('DJANGO_DEBUG', '0') == '1' and not PRODUCTION
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
 if not SECRET_KEY:
-    raise ImproperlyConfigured('Set DJANGO_SECRET_KEY in the environment (see README).')
+    raise ImproperlyConfigured('Set DJANGO_SECRET_KEY in the environment (see .env.example).')
 if PRODUCTION and (len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 5):
     raise ImproperlyConfigured('Production requires a strong random DJANGO_SECRET_KEY (50+ characters).')
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,testserver').split(',') if h.strip()]
