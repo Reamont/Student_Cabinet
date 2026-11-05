@@ -63,6 +63,8 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
             'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'}}
+# Enable only behind the bundled nginx configuration with per-client login limits.
+LOGIN_RATE_LIMIT_AT_PROXY = os.environ.get('LOGIN_RATE_LIMIT_AT_PROXY', '0') == '1'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
