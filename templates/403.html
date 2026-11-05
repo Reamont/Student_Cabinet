@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block title %}Доступ ограничен{% endblock %}
+{% block content %}
+<section class="card reading-card error-page"><span class="eyebrow">403 · ДОСТУП ОГРАНИЧЕН</span><h1>Здесь нужны права доступа</h1><p class="intro-text">Это действие недоступно твоему аккаунту. Если страница была открыта давно, вернись к форме и попробуй снова.</p><a class="button button-primary" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}">Вернуться в кабинет <svg class="icon"><use href="#i-arrow"/></svg></a></section>
+{% endblock %}

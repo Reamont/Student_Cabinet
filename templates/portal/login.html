@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+<div class="login-layout">
+  <section class="login-story" aria-labelledby="login-title">
+    <a class="brand" href="{% url 'login' %}"><span class="brand-mark" aria-hidden="true">п.</span><span>пульс<span class="brand-subtitle">КАМПУСА</span></span></a>
+    <div class="login-intro"><span class="eyebrow light">ТВОЙ РИТМ. ТВОЙ КАМПУС.</span><h1 id="login-title">Больше жизни.<br>Меньше<br><span>суеты.</span></h1><p>Расписание, учебные дела и связь с деканатом — в одном спокойном пространстве.</p></div>
+    <div class="orbit-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div><div class="orbit-core">п.</div><span class="orbit-label label-one"><svg class="icon"><use href="#i-calendar"/></svg> Всё по плану</span><span class="orbit-label label-two"><svg class="icon"><use href="#i-check"/></svg> Заявка принята</span><span class="orbit-star">✳</span></div>
+    <div class="login-story-footer"><span>РТУ МЕМРЭА</span><span>Цифровой деканат будущего</span></div>
+  </section>
+  <section class="login-panel" aria-label="Вход в личный кабинет">
+    <div class="login-form-wrap"><span class="eyebrow">РАДЫ ВИДЕТЬ ТЕБЯ</span><h2>С возвращением</h2><p class="intro-text">Войди, чтобы узнать, что важного сегодня.</p>
+      <form method="post" action="{% url 'login' %}" class="stack-form" data-submit-state>{% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        {% if form.non_field_errors %}<div class="form-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        {% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="field-errors" id="{{ field.auto_id }}_errors">{{ field.errors }}</div>{% endif %}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}</div>{% endfor %}
+        <button class="button button-primary button-wide" type="submit" data-pending-text="Входим…">Войти в кабинет <svg class="icon"><use href="#i-arrow"/></svg></button>
+      </form>
+      <div class="login-hint"><svg class="icon"><use href="#i-user"/></svg><p>Учётные записи выдаёт организатор демонстрации. Для входа используй тестовый логин и пароль.</p></div>
+      <div class="prototype-disclaimer"><strong>Конкурсный прототип.</strong> Не является официальным сервисом вуза. Все данные вымышлены.</div>
+    </div>
+    <p class="login-smallprint">Пульс Кампуса · Сделано для студенческого дня</p>
+  </section>
+</div>
+{% endblock %}

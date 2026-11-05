@@ -1,0 +1,43 @@
+name: campus-pulse
+services:
+  db:
+    image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: campus
+      POSTGRES_USER: campus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a unique POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus -d campus"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  web:
+    build:
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      APP_ENV: production
+      DJANGO_DEBUG: "0"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set a unique DJANGO_SECRET_KEY in .env}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?Set real domain and localhost}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:?Set HTTPS origin}
+      DATABASE_URL: postgresql://campus:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/campus
+      DEMO_STUDENT_PASSWORD: ${DEMO_STUDENT_PASSWORD:-}
+      DEMO_SECOND_PASSWORD: ${DEMO_SECOND_PASSWORD:-}
+      DEMO_STAFF_PASSWORD: ${DEMO_STAFF_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; r=urllib.request.Request('http://localhost:8000/login/', headers={'X-Forwarded-Proto':'https'}); assert urllib.request.urlopen(r, timeout=5).status == 200"]
+      interval: 30s
+      timeout: 8s
+      start_period: 20s
+      retries: 3
+volumes:
+  postgres_data:

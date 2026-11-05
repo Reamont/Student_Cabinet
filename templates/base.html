@@ -1,0 +1,68 @@
+{% load static %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#17242a">
+  <title>{% block title %}Пульс Кампуса{% endblock %} · РТУ МЕМРЭА</title>
+  <link rel="stylesheet" href="{% static 'portal/app.css' %}">
+  <script src="{% static 'portal/app.js' %}" defer></script>
+</head>
+<body>
+  <svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2m-8 3h2"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 3v18h17M8 16v-5m5 5V7m5 9v-7"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H5a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9Zm0 0v6h6M8 13h8m-8 4h5"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 9 3 7 3 10H3c0-3 3-1 3-10Zm4 13h4"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-exit" viewBox="0 0 24 24"><path d="M9 4H4v16h5m0-8h12m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></symbol>
+  </defs></svg>
+  <a class="skip-link" href="#main">Перейти к содержимому</a>
+  {% if user.is_authenticated %}
+  <aside class="sidebar" aria-label="Главная навигация">
+    <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark" aria-hidden="true">п.</span><span>пульс<span class="brand-subtitle">КАМПУСА</span></span></a>
+    <div class="university">РТУ МЕМРЭА<span>Цифровое пространство студента</span></div>
+    <div class="nav-caption">МОЙ КАМПУС</div>
+    <nav class="side-nav">
+      <a href="{% url 'dashboard' %}" class="{% if nav_section == 'dashboard' %}active{% endif %}" {% if nav_section == 'dashboard' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></a>
+      <a href="{% url 'schedule' %}" class="{% if nav_section == 'schedule' %}active{% endif %}" {% if nav_section == 'schedule' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-calendar"/></svg><span>Расписание</span></a>
+      <a href="{% url 'grades' %}" class="{% if nav_section == 'grades' %}active{% endif %}" {% if nav_section == 'grades' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-chart"/></svg><span>Успеваемость</span></a>
+      <a href="{% url 'requests' %}" class="{% if nav_section == 'requests' %}active{% endif %}" {% if nav_section == 'requests' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-file"/></svg><span>Заявки</span></a>
+      <a href="{% url 'profile' %}" class="{% if nav_section == 'profile' %}active{% endif %}" {% if nav_section == 'profile' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-user"/></svg><span>Профиль</span></a>
+    </nav>
+    <div class="sidebar-note"><span class="live-dot"></span> Всё важное — рядом.<p>Учёба, планы и деканат<br>в одном пространстве.</p></div>
+    <div class="sidebar-bottom">
+      <a class="sidebar-profile" href="{% url 'profile' %}"><span class="avatar">{{ profile.full_name|first|default:'С' }}</span><span><strong>{{ profile.full_name|default:user.username }}</strong><small>{{ profile.group|default:'Сотрудник' }}</small></span></a>
+      <form action="{% url 'logout' %}" method="post">{% csrf_token %}<button class="logout" type="submit"><svg class="icon"><use href="#i-exit"/></svg> Выйти</button></form>
+    </div>
+  </aside>
+  {% endif %}
+  <div class="{% if user.is_authenticated %}app-shell{% else %}guest-shell{% endif %}">
+    {% if user.is_authenticated %}
+    <header class="topbar"><span class="topbar-title">Личный кабинет <span class="topbar-divider">/</span> <span class="muted">Студент</span></span><div class="topbar-actions"><span class="topbar-date">{{ today|date:'j E Y' }} <span>· Москва</span></span><a class="notification-button {% if unread_count %}has-unread{% endif %}" href="{% url 'notifications' %}" aria-label="Уведомления{% if unread_count %}: непрочитанных {{ unread_count }}{% endif %}"><svg class="icon"><use href="#i-bell"/></svg>{% if unread_count %}<span class="notification-count">{{ unread_count }}</span>{% endif %}</a></div></header>
+    {% endif %}
+    <main id="main" class="{% if user.is_authenticated %}main-content{% endif %}" tabindex="-1">
+      {% if demo_period %}<div class="demo-period">Демонстрационные данные · {{ demo_period.start|date:'d.m.Y' }} — {{ demo_period.end|date:'d.m.Y' }} · время Москвы</div>{% endif %}
+      {% if messages %}<div class="messages" aria-live="polite">{% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+    {% if user.is_authenticated %}<footer class="app-footer"><span>Пульс Кампуса · Конкурсный прототип</span><a href="{% url 'profile' %}#about">О проекте и данных <span aria-hidden="true">↗</span></a></footer>{% endif %}
+  </div>
+  {% if user.is_authenticated %}
+  <nav class="mobile-nav" aria-label="Мобильная навигация">
+    <a href="{% url 'dashboard' %}" class="{% if nav_section == 'dashboard' %}active{% endif %}" {% if nav_section == 'dashboard' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></a>
+    <a href="{% url 'schedule' %}" class="{% if nav_section == 'schedule' %}active{% endif %}" {% if nav_section == 'schedule' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-calendar"/></svg><span>Расписание</span></a>
+    <a href="{% url 'grades' %}" class="{% if nav_section == 'grades' %}active{% endif %}" {% if nav_section == 'grades' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-chart"/></svg><span>Оценки</span></a>
+    <a href="{% url 'requests' %}" class="{% if nav_section == 'requests' %}active{% endif %}" {% if nav_section == 'requests' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-file"/></svg><span>Заявки</span></a>
+    <a href="{% url 'profile' %}" class="{% if nav_section == 'profile' %}active{% endif %}" {% if nav_section == 'profile' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-user"/></svg><span>Профиль</span></a>
+  </nav>{% endif %}
+</body></html>

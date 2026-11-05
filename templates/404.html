@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block title %}Страница не найдена{% endblock %}
+{% block content %}
+<section class="card reading-card error-page"><span class="eyebrow">404 · НЕ НАЙДЕНО</span><h1>Кажется, мы разминулись</h1><p class="intro-text">Такой страницы нет или запись недоступна твоему аккаунту. Проверь адрес или вернись на главную.</p><a class="button button-primary" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}">На главную <svg class="icon"><use href="#i-arrow"/></svg></a></section>
+{% endblock %}
