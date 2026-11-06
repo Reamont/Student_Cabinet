@@ -16,3 +16,70 @@
 @media print{.sidebar,.topbar,.mobile-nav,.app-footer,.button,.back-link,.filter-form{display:none!important}.app-shell{margin:0}.main-content{padding:0;max-width:none}.card{break-inside:avoid;box-shadow:none}.dashboard-grid{display:block}.dashboard-main,.dashboard-aside{display:block}.card,.next-class-card,.attention-card,.schedule-alert{margin-bottom:20px}.login-story{display:none}.login-layout{display:block}.login-panel{padding:20px}}
 
 .guest-shell .error-page{margin:10vh auto;max-width:650px}.error-page h1{font-size:32px}.error-page .intro-text{line-height:1.8;margin-bottom:25px}@media(max-width:760px){.guest-shell .error-page{margin:35px 17px}.error-page h1{font-size:28px}}
+
+/* Keep small informational text readable on the light card backgrounds. */
+.text-button,
+.demo-period,
+.plan-topline .eyebrow,
+.plan-index,
+.plan-footnote,
+.about-card .eyebrow,
+.attention-card .eyebrow,
+.attention-card .text-link,
+.date-picker label,
+.segmented a,
+.heading-count {
+  color: #526349;
+}
+
+.notification-meta .unread-label {
+  color: #526d35;
+}
+
+.is-cancelled .lesson-main h3,
+.is-cancelled .lesson-time {
+  color: #657265;
+}
+
+.badge.work {
+  color: #675e35;
+}
+
+.badge.clarify {
+  color: #85571f;
+}
+
+/* Standalone links need the same touch area as form buttons. */
+.notification-button,
+.icon-button {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+.text-link,
+.back-link,
+.schedule-alert a,
+.notification-main h2 a,
+.app-footer a,
+.empty-inline a {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.deadline > a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.next-link,
+.text-button,
+.segmented a,
+.page-heading > .button {
+  min-height: 44px;
+}

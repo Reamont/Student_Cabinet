@@ -511,3 +511,17 @@ class PortalIntegrationTests(TestCase):
             {'username': self.alisa.username, 'password': self.password},
             HTTP_X_FORWARDED_FOR='198.51.100.1')
         self.assertEqual(response.status_code, 429)
+
+    def test_employee_history_uses_same_local_time_as_student(self):
+        from django.contrib import admin
+        from .admin import RequestAdmin
+        from datetime import timezone as datetime_timezone
+
+        RequestHistory.objects.create(
+            request=self.request_a, status='work', comment='Проверка времени',
+            created_at=datetime(2026, 11, 6, 12, 0, tzinfo=datetime_timezone.utc))
+        with timezone.override('Europe/Moscow'):
+            employee_text = RequestAdmin(StudentRequest, admin.site).status_history(self.request_a)
+            self.assertIn('06.11.2026 15:00', employee_text)
+            response = self.client.get(reverse('request_detail', args=[self.request_a.pk]))
+            self.assertContains(response, '06.11.2026, 15:00')
