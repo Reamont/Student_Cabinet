@@ -438,3 +438,90 @@ class PortalIntegrationTests(TestCase):
         self.assertEqual(custom_request.text, 'Сохранить собственную заявку после seed')
         self.assertIsNotNone(notification.read_at)
 
+
+    def test_future_deadline_is_not_hidden_by_overdue_tasks(self):
+        now = timezone.now()
+        overdue = [Deadline.objects.create(user=self.alisa, discipline=self.discipline_a,
+                    title=f'Просроченная задача {i}', due=now-timedelta(days=i+1)) for i in range(5)]
+        upcoming = Deadline.objects.create(user=self.alisa, discipline=self.discipline_a,
+                    title='Завтрашняя задача', due=now+timedelta(days=1))
+        Deadline.objects.create(user=self.alisa, discipline=self.discipline_a,
+                    title='Уже выполнено', due=now+timedelta(hours=1), done=True)
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual([d.pk for d in response.context['deadlines']], [upcoming.pk])
+        plan_titles = [p['title'] for p in response.context['plan']]
+        for task in overdue:
+            self.assertIn(task.title, plan_titles)
+        self.assertNotIn(self.deadline_b.title, plan_titles)
+
+    def test_next_lesson_after_long_break_is_visible_and_group_scoped(self):
+        Lesson.objects.filter(group=self.group_a).delete()
+        future = timezone.localdate()+timedelta(days=30)
+        Lesson.objects.create(group=self.group_a, discipline=self.discipline_a,
+            date=future-timedelta(days=1), start=time(9), end=time(10),
+            room='101', teacher='Отменённое', cancelled=True)
+        expected = Lesson.objects.create(group=self.group_a, discipline=self.discipline_a,
+            date=future, start=time(9), end=time(10), room='101', teacher='Следующее')
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.context['next_lesson'].pk, expected.pk)
+        self.assertFalse(response.context['next_lesson'].is_current)
+        self.assertContains(response, f'?date={future.isoformat()}')
+
+    @override_settings(LOGIN_RATE_LIMIT_AT_PROXY=True)
+    def test_proxy_clients_do_not_share_app_address_limit(self):
+        self.client.logout()
+        for i in range(40):
+            response = self.client.post(reverse('login'),
+                {'username': f'unknown-{i}', 'password': 'wrong'},
+                REMOTE_ADDR='172.18.0.1', HTTP_X_FORWARDED_FOR='192.0.2.1')
+            self.assertEqual(response.status_code, 200)
+        response = self.client.post(reverse('login'),
+            {'username': self.alisa.username, 'password': self.password},
+            REMOTE_ADDR='172.18.0.1', HTTP_X_FORWARDED_FOR='192.0.2.2')
+        self.assertEqual(response.status_code, 302)
+        self.client.logout()
+        response = self.client.post(reverse('login'),
+            {'username': self.boris.username, 'password': self.password},
+            REMOTE_ADDR='172.18.0.1', HTTP_X_FORWARDED_FOR='192.0.2.3')
+        self.assertEqual(response.status_code, 302)
+
+    @override_settings(LOGIN_RATE_LIMIT_AT_PROXY=True)
+    def test_proxy_mode_keeps_account_limit_across_login_routes(self):
+        self.client.logout()
+        for i in range(10):
+            url = reverse('login') if i % 2 == 0 else reverse('admin:login')
+            response = self.client.post(url,
+                {'username': self.alisa.username, 'password': 'wrong'},
+                HTTP_X_FORWARDED_FOR=f'192.0.2.{i}')
+            self.assertEqual(response.status_code, 200)
+        response = self.client.post(reverse('login'),
+            {'username': self.alisa.username, 'password': self.password})
+        self.assertEqual(response.status_code, 429)
+        response = self.client.post(reverse('login'),
+            {'username': self.boris.username, 'password': self.password})
+        self.assertEqual(response.status_code, 302)
+
+    @override_settings(LOGIN_RATE_LIMIT_AT_PROXY=False)
+    def test_direct_mode_does_not_trust_spoofed_forwarded_addresses(self):
+        self.client.logout()
+        for i in range(40):
+            self.client.post(reverse('login'), {'username': f'unknown-{i}', 'password': 'wrong'},
+                             HTTP_X_FORWARDED_FOR=f'192.0.2.{i}')
+        response = self.client.post(reverse('login'),
+            {'username': self.alisa.username, 'password': self.password},
+            HTTP_X_FORWARDED_FOR='198.51.100.1')
+        self.assertEqual(response.status_code, 429)
+
+    def test_employee_history_uses_same_local_time_as_student(self):
+        from django.contrib import admin
+        from .admin import RequestAdmin
+        from datetime import timezone as datetime_timezone
+
+        RequestHistory.objects.create(
+            request=self.request_a, status='work', comment='Проверка времени',
+            created_at=datetime(2026, 11, 6, 12, 0, tzinfo=datetime_timezone.utc))
+        with timezone.override('Europe/Moscow'):
+            employee_text = RequestAdmin(StudentRequest, admin.site).status_history(self.request_a)
+            self.assertIn('06.11.2026 15:00', employee_text)
+            response = self.client.get(reverse('request_detail', args=[self.request_a.pk]))
+            self.assertContains(response, '06.11.2026, 15:00')

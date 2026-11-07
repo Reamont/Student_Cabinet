@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import admin
+from django.utils import timezone
 from .models import StudentRequest
 from .services import record_status
 
@@ -37,7 +38,7 @@ class RequestAdmin(admin.ModelAdmin):
 
     @admin.display(description='История')
     def status_history(self, obj):
-        return '\n'.join(f'{h.created_at:%d.%m.%Y %H:%M} · {h.get_status_display()} · {h.comment}' for h in obj.history.all())
+        return '\n'.join(f'{timezone.localtime(h.created_at):%d.%m.%Y %H:%M} · {h.get_status_display()} · {h.comment}' for h in obj.history.all())
 
     def save_model(self, request, obj, form, change):
         old_status = StudentRequest.objects.select_for_update().get(pk=obj.pk).status

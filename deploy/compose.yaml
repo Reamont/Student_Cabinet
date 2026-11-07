@@ -26,6 +26,8 @@ services:
     environment:
       APP_ENV: production
       DJANGO_DEBUG: "0"
+      # Requires the per-client limit in deploy/nginx.conf; web stays loopback-only.
+      LOGIN_RATE_LIMIT_AT_PROXY: "1"
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set a unique DJANGO_SECRET_KEY in .env}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?Set real domain and localhost}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:?Set HTTPS origin}

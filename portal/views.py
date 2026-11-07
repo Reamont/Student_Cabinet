@@ -55,10 +55,17 @@ def average_for(user):
 
 @student_required
 def dashboard(request):
-    today = timezone.localdate()
+    now = timezone.localtime()
+    today = now.date()
     lessons = lessons_for(request.student, today, today + timedelta(days=14))
-    upcoming = [l for l in lessons if l.is_next or l.is_current]
-    deadlines = list(Deadline.objects.filter(user=request.user, done=False).select_related('discipline')[:5])
+    next_lesson = (Lesson.objects.filter(group=request.student.group, cancelled=False)
+                   .filter(Q(date__gt=today) | Q(date=today, end__gt=now.time()))
+                   .select_related('discipline').order_by('date', 'start').first())
+    if next_lesson:
+        next_lesson.is_current = (next_lesson.date == today and
+                                  next_lesson.start <= now.time() < next_lesson.end)
+    deadlines = list(Deadline.objects.filter(user=request.user, done=False, due__gte=now)
+                     .select_related('discipline')[:5])
     active = StudentRequest.objects.filter(user=request.user).exclude(status__in=['ready', 'rejected'])[:4]
     plan = []
     for lesson in lessons:
@@ -70,13 +77,13 @@ def dashboard(request):
                          'url': reverse('schedule') + '?date=' + today.isoformat(), 'kind': 'Занятие'})
     for deadline in Deadline.objects.filter(user=request.user, done=False, due__date__lte=today).select_related('discipline'):
         if timezone.localtime(deadline.due).date() <= today:
-            plan.append({'title': deadline.title, 'reason': 'Срок сегодня' if timezone.localtime(deadline.due).date() == today else 'Срок прошёл — проверьте выполнение',
+            plan.append({'title': deadline.title, 'reason': 'Срок прошёл — проверьте выполнение' if deadline.due < now else 'Срок сегодня',
                          'url': reverse('grades') + f'#deadline-{deadline.pk}', 'kind': 'Дедлайн'})
     for item in StudentRequest.objects.filter(user=request.user, status='clarify'):
         plan.append({'title': f'{item.number} · Ответьте на уточнение', 'reason': 'Деканату нужны дополнительные сведения',
                      'url': reverse('request_detail', args=[item.pk]), 'kind': 'Заявка'})
     return render(request, 'portal/dashboard.html', {
-        'nav_section': 'dashboard', 'next_lesson': upcoming[0] if upcoming else None,
+        'nav_section': 'dashboard', 'next_lesson': next_lesson,
         'lessons': [l for l in lessons if l.date == today],
         'changed_lessons': [l for l in lessons if l.cancelled or l.old_start or l.old_room][:3],
         'deadlines': deadlines, 'active_requests': active, 'plan': plan,

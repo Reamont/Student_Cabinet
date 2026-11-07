@@ -28,8 +28,8 @@ class PrivateResponseMiddleware:
 class LoginRateLimitMiddleware:
     """Shared DB-backed window for student and built-in employee login.
 
-    Count all POST attempts, including successful ones. Never trust X-Forwarded-For;
-    deployment proxy must preserve source isolation or enforce its own edge limit.
+    Count all POST attempts, including successful ones. Never trust X-Forwarded-For.
+    When configured, nginx enforces the address limit; the account limit stays here.
     """
     def __init__(self, get_response):
         self.get_response = get_response
@@ -40,8 +40,9 @@ class LoginRateLimitMiddleware:
     def process_view(self, request, view_func, view_args, view_kwargs):
         if request.method != 'POST' or request.path not in ('/login/', '/admin/login/'):
             return None
-        identifiers = [('account:' + request.POST.get('username', '').strip().casefold(), 10),
-                       ('address:' + request.META.get('REMOTE_ADDR', ''), 40)]
+        identifiers = [('account:' + request.POST.get('username', '').strip().casefold(), 10)]
+        if not settings.LOGIN_RATE_LIMIT_AT_PROXY:
+            identifiers.append(('address:' + request.META.get('REMOTE_ADDR', ''), 40))
         blocked = False
         now = timezone.now()
         with transaction.atomic():
