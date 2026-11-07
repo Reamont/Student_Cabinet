@@ -98,11 +98,11 @@ class Command(BaseCommand):
             'body': 'Открыта запись на студенческую проектную мастерскую. Можно прийти со своей идеей или присоединиться к команде. '
                     'Встреча проходит в открытой зоне библиотеки. Это вымышленное объявление конкурсного прототипа.'})
         for index, user in enumerate(users[:2]):
-            group, _ = Group.objects.get_or_create(name=['ИКБО-12-25', 'ДИЗ-04-24'][index])
+            group, _ = Group.objects.get_or_create(name=['АБВГ-01-02', 'ДИЗ-04-24'][index])
             Profile.objects.get_or_create(user=user, defaults={
                 'full_name': ['Алиса Андреевна Лебедева', 'Максим Сергеевич Орлов'][index],
-                'faculty': ['Институт информационных технологий', 'Институт цифрового дизайна'][index],
-                'program': ['09.03.02 · Информационные системы и технологии', '54.03.01 · Дизайн'][index],
+                'faculty': ['Институт информативных технологий', 'Институт цифрового дизайна'][index],
+                'program': ['10.10.10 · Информационные системы и технологии', '54.03.01 · Дизайн'][index],
                 'year': 2 + index, 'group': group, 'student_number': f'DEMO-2026-00{index+1}',
             })
             seed_schedule(group, disciplines, index, monday, today)
