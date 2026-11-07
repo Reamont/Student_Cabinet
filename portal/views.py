@@ -12,9 +12,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import ClarificationForm, RequestForm
-from .models import Deadline, LearningResult, Lesson, Notification, Profile, StudentRequest
-from .services import record_status
+from .forms import ClarificationForm, RequestDraftForm, RequestForm
+from .models import Deadline, LearningResult, Lesson, Notification, Profile, RequestDraft, StudentRequest
+from .services import lock_request_owner, record_status, save_request_draft
 
 
 class StudentLoginView(LoginView):
@@ -134,19 +134,26 @@ def deadline_toggle(request, pk):
 @student_required
 def requests_list(request):
     return render(request, 'portal/requests.html', {'nav_section': 'requests',
-        'student_requests': StudentRequest.objects.filter(user=request.user)})
+        'student_requests': StudentRequest.objects.filter(user=request.user),
+        'drafts': RequestDraft.objects.filter(user=request.user)})
 
 
 @student_required
 def request_new(request):
     if request.method != 'GET':
         return HttpResponseNotAllowed(['GET'])
-    return render(request, 'portal/request_form.html', {'nav_section': 'requests', 'form': RequestForm(user=request.user)})
+    kind = request.GET.get('kind', '')
+    initial = {'kind': kind} if kind in dict(StudentRequest.Kind.choices) else {}
+    return render(request, 'portal/request_form.html', {'nav_section': 'requests',
+        'form': RequestForm(user=request.user, initial=initial)})
 
 
 @student_required
 @require_POST
 def request_review(request):
+    draft_form = RequestDraftForm(request.POST, user=request.user)
+    if draft_form.is_valid():
+        save_request_draft(request.user, draft_form)
     form = RequestForm(request.POST, user=request.user)
     if not form.is_valid():
         return render(request, 'portal/request_form.html', {'nav_section': 'requests', 'form': form}, status=422)
@@ -164,6 +171,7 @@ def request_submit(request):
         return render(request, 'portal/request_form.html', {'nav_section': 'requests', 'form': form}, status=422)
     payload = {k: form.cleaned_data[k] for k in ('kind', 'destination', 'text')}
     with transaction.atomic():
+        lock_request_owner(request.user)
         item, created = StudentRequest.objects.get_or_create(idempotency_key=form.idempotency_key,
             defaults={'user': request.user, **payload})
         if item.user_id != request.user.pk:
@@ -175,6 +183,7 @@ def request_submit(request):
             return render(request, 'portal/request_form.html', {'nav_section': 'requests', 'form': form}, status=409)
         if created:
             record_status(item, request.user, 'Обращение принято. Следите за статусом здесь.')
+        RequestDraft.objects.filter(user=request.user, idempotency_key=form.idempotency_key).delete()
     messages.success(request, f'Заявка {item.number} отправлена.' if created else f'Заявка {item.number} уже была отправлена. Дубликат не создан.')
     return redirect('request_detail', pk=item.pk)
 

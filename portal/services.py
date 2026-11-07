@@ -1,5 +1,23 @@
 from django.db import transaction
-from .models import Notification, RequestHistory
+from django.contrib.auth import get_user_model
+from .models import Notification, RequestDraft, RequestHistory, StudentRequest
+
+
+def lock_request_owner(user):
+    # Serialize draft saves with submission: a late autosave must not recreate
+    # the draft after it has already become a submitted request.
+    get_user_model().objects.select_for_update().get(pk=user.pk)
+
+
+@transaction.atomic
+def save_request_draft(user, form):
+    lock_request_owner(user)
+    if StudentRequest.objects.filter(idempotency_key=form.idempotency_key).exists():
+        return None
+    draft, _ = RequestDraft.objects.update_or_create(
+        user=user, idempotency_key=form.idempotency_key,
+        defaults={field: form.cleaned_data.get(field, '') for field in ('kind', 'destination', 'text')})
+    return draft
 
 
 @transaction.atomic

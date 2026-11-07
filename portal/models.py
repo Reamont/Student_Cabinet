@@ -118,6 +118,18 @@ class StudentRequest(models.Model):
         return f'{self.number} · {self.get_kind_display()}'
 
 
+class RequestDraft(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    idempotency_key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    kind = models.CharField(max_length=20, choices=StudentRequest.Kind.choices, blank=True)
+    destination = models.CharField(max_length=200, blank=True)
+    text = models.TextField(max_length=3000, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-pk']
+
+
 class RequestHistory(models.Model):
     request = models.ForeignKey(StudentRequest, on_delete=models.CASCADE, related_name='history')
     status = models.CharField(max_length=12, choices=StudentRequest.Status.choices)

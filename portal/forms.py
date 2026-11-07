@@ -15,11 +15,11 @@ class RequestForm(forms.Form):
                            help_text='Для заявления опишите вопрос (не менее 10 символов). Не указывайте реальные персональные данные.')
     token = forms.CharField(widget=forms.HiddenInput)
 
-    def __init__(self, *args, user, **kwargs):
+    def __init__(self, *args, user, draft_key=None, **kwargs):
         self.user = user
         super().__init__(*args, **kwargs)
         if not self.is_bound:
-            self.fields['token'].initial = signing.dumps({'user': user.pk, 'key': str(uuid.uuid4())}, salt='request-form')
+            self.fields['token'].initial = signing.dumps({'user': user.pk, 'key': str(draft_key or uuid.uuid4())}, salt='request-form')
 
     def clean_token(self):
         token = self.cleaned_data['token']
@@ -39,6 +39,14 @@ class RequestForm(forms.Form):
         if data.get('kind') == StudentRequest.Kind.APPLICATION and len(data.get('text', '')) < 10:
             self.add_error('text', 'Опишите вопрос: не менее 10 символов.')
         return data
+
+
+class RequestDraftForm(RequestForm):
+    kind = forms.ChoiceField(label='Тип обращения', choices=StudentRequest.Kind.choices, required=False)
+
+    def clean(self):
+        # Incomplete text and missing destination are valid in a draft.
+        return forms.Form.clean(self)
 
 
 class ClarificationForm(forms.Form):

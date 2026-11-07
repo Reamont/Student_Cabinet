@@ -25,8 +25,12 @@ class SeedScheduleTests(TestCase):
 
     def test_weekly_counts_repeat_through_december_and_groups_differ(self):
         self.seed()
+        profile = get_user_model().objects.get(username='alisa').profile
+        self.assertEqual(profile.faculty, 'Институт информативных технологий')
+        self.assertEqual(profile.program, '10.10.10 · Информационные системы и технологии')
+        self.assertEqual(profile.group.name, 'АБВГ-01-02')
         expected_counts = (3, 3, 5, 2, 2, 0, 0)
-        groups = [Group.objects.get(name=name) for name in ('ИКБО-12-25', 'ДИЗ-04-24')]
+        groups = [Group.objects.get(name=name) for name in ('АБВГ-01-02', 'ДИЗ-04-24')]
         monday = date(2026, 11, 2)
         end = date(2026, 12, 31)
         for group in groups:
@@ -52,7 +56,7 @@ class SeedScheduleTests(TestCase):
 
     def test_refresh_legacy_rows_preserves_custom_data_and_read_state(self):
         self.seed()
-        group = Group.objects.get(name='ИКБО-12-25')
+        group = Group.objects.get(name='АБВГ-01-02')
         # Recreate the obsolete third Thursday/Friday slots from the old seed.
         names = ['Алгоритмы и структуры данных', 'Проектирование информационных систем',
                  'Математический анализ', 'Английский язык', 'Физическая культура',
