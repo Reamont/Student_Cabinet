@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE = os.environ.get('SMOKE_BASE_URL', 'http://127.0.0.1:8000').rstrip('/')
-SHOTS = ROOT / 'docs' / 'screenshots'
+SHOTS = ROOT / 'var' / 'browser' / 'screenshots'
 SHOTS.mkdir(parents=True, exist_ok=True)
 values = {}
 for line in (ROOT / 'var' / 'dev.env').read_text().splitlines():
@@ -237,4 +237,4 @@ with sync_playwright() as playwright:
 
 assert not errors, errors
 assert not resources, resources
-print('All browser smoke checks passed; screenshots saved in docs/screenshots/.')
+print('All browser smoke checks passed; screenshots saved in var/browser/screenshots/.')

@@ -1,2 +1,2 @@
-# Browser verification and report export only; not required by the web server.
+# Browser verification only; not required by the web server.
 playwright==1.62.0

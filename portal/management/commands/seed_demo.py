@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -12,6 +12,52 @@ from django.utils import timezone
 
 from portal.models import (Announcement, Deadline, Discipline, Group, LearningResult,
                            Lesson, Notification, Profile, RequestHistory, StudentRequest)
+
+
+SEMESTER_END = date(2026, 12, 31)
+CANCELLED_DEMO_DAY = date(2026, 11, 4)
+WEEKDAY_SLOTS = (3, 3, 5, 2, 2, 0, 0)
+
+
+def lesson_values(day, slot, *, legacy=False):
+    moved = slot == 1 and day.weekday() in (1, 3)
+    cancelled = (slot == 2 and day.weekday() == 4) if legacy else (
+        day == CANCELLED_DEMO_DAY and slot == 4)
+    starts = (time(9), time(11, 45) if moved else time(10, 40), time(14), time(15, 50), time(17, 30))
+    ends = (time(10, 30), time(13, 15) if moved else time(12, 10), time(15, 30), time(17, 20), time(19))
+    return {
+        'start': starts[slot], 'end': ends[slot],
+        'kind': ('Лекция', 'Практика', 'Лабораторная')[slot % 3],
+        'room': ('А-304 · корпус А', 'Б-215 · корпус Б', 'А-108 · корпус А')[slot % 3],
+        'teacher': ('Ирина Павловна Соколова', 'Дмитрий Викторович Крылов', 'Ольга Игоревна Миронова')[slot % 3],
+        'cancelled': cancelled, 'old_start': time(10, 40) if moved else None,
+        'old_room': 'А-201 · корпус А' if moved else '',
+        'change_note': 'Преподаватель на конференции. Занятие отменено.' if cancelled else
+                       'Изменены время и аудитория. Проверьте маршрут между корпусами.' if moved else '',
+    }
+
+
+def seed_schedule(group, disciplines, index, monday, today):
+    # Older seed versions made three lessons each weekday. Match every generated
+    # field before replacing obsolete rows; custom lessons and edits are preserved.
+    for lesson in Lesson.objects.filter(group=group, date__gte=monday).select_related('discipline'):
+        for slot in range(3):
+            expected = lesson_values(lesson.date, slot, legacy=True)
+            discipline = disciplines[(lesson.date.weekday() + slot + index * 3) % len(disciplines)]
+            if lesson.date.weekday() < 5 and lesson.discipline_id == discipline.pk and all(
+                    getattr(lesson, field) == value for field, value in expected.items()):
+                if lesson.date > SEMESTER_END or slot >= WEEKDAY_SLOTS[lesson.date.weekday()]:
+                    lesson.delete()
+                break
+    if today > SEMESTER_END:
+        return
+    for offset in range((SEMESTER_END - monday).days + 1):
+        day = monday + timedelta(days=offset)
+        for slot in range(WEEKDAY_SLOTS[day.weekday()]):
+            values = lesson_values(day, slot)
+            discipline = disciplines[(day.weekday() + slot + index * 3) % len(disciplines)]
+            Lesson.objects.get_or_create(
+                group=group, date=day, start=values.pop('start'), discipline=discipline, defaults=values)
 
 
 class Command(BaseCommand):
@@ -59,26 +105,7 @@ class Command(BaseCommand):
                 'program': ['09.03.02 · Информационные системы и технологии', '54.03.01 · Дизайн'][index],
                 'year': 2 + index, 'group': group, 'student_number': f'DEMO-2026-00{index+1}',
             })
-            for offset in range(14):
-                day = monday + timedelta(days=offset)
-                if day.weekday() >= 5:
-                    continue
-                for slot in range(3):
-                    discipline = disciplines[(offset + slot + index * 3) % len(disciplines)]
-                    moved = slot == 1 and day.weekday() in (1, 3)
-                    cancelled = slot == 2 and day.weekday() == 4
-                    Lesson.objects.get_or_create(group=group, date=day, start=[time(9, 0), time(11, 45) if moved else time(10, 40), time(14, 0)][slot],
-                        discipline=discipline, defaults={
-                            'end': [time(10, 30), time(13, 15) if moved else time(12, 10), time(15, 30)][slot],
-                            'kind': ['Лекция', 'Практика', 'Лабораторная'][slot],
-                            'room': ['А-304 · корпус А', 'Б-215 · корпус Б', 'А-108 · корпус А'][slot],
-                            'teacher': ['Ирина Павловна Соколова', 'Дмитрий Викторович Крылов', 'Ольга Игоревна Миронова'][slot],
-                            'cancelled': cancelled,
-                            'old_start': time(10, 40) if moved else None,
-                            'old_room': 'А-201 · корпус А' if moved else '',
-                            'change_note': 'Преподаватель на конференции. Занятие отменено.' if cancelled else
-                                           'Изменены время и аудитория. Проверьте маршрут между корпусами.' if moved else '',
-                        })
+            seed_schedule(group, disciplines, index, monday, today)
             states = ['grade', 'grade', 'pass', 'pending', 'empty', 'debt']
             for i, state in enumerate(states):
                 LearningResult.objects.get_or_create(user=user, discipline=disciplines[(i+index)%len(disciplines)], defaults={
@@ -112,9 +139,11 @@ class Command(BaseCommand):
                                                 body=comment, related_request=item)
             Notification.objects.get_or_create(user=user, announcement=announcement, defaults={
                 'kind': 'announcement', 'title': announcement.title, 'body': announcement.body})
-            Notification.objects.get_or_create(user=user, kind='schedule', title='Изменения в расписании группы ' + group.name, defaults={
-                'body': 'Во вторник и четверг вторая пара перенесена с 10:40 на 11:45, из А-201 в Б-215. '
-                        'В пятницу третья пара отменена. Даты смотрите в расписании.'})
+            Notification.objects.update_or_create(user=user, kind='schedule', title='Изменения в расписании группы ' + group.name, defaults={
+                'body': 'Расписание до 31.12.2026 повторяется каждую неделю: понедельник и вторник — 3 пары, '
+                        'среда — 5, четверг и пятница — 2; суббота и воскресенье — выходные. '
+                        'Переносы времени и аудитории, а также отдельные отмены явно отмечены у занятий. '
+                        'Проверяйте даты и статусы в расписании.'})
         self.stdout.write(self.style.SUCCESS(
             'Demo prepared: alisa, maks; staff: curator. Existing passwords and requests preserved. '
-            f'Schedule: {monday:%d.%m.%Y} – {monday+timedelta(days=13):%d.%m.%Y}.'))
+            f'Demo schedule ends on {SEMESTER_END:%d.%m.%Y}; existing custom lessons preserved.'))
