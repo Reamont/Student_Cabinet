@@ -57,7 +57,7 @@
       {% if messages %}<div class="messages" aria-live="polite">{% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
       {% block content %}{% endblock %}
     </main>
-    {% if user.is_authenticated %}<footer class="app-footer"><span>Пульс Кампуса · Конкурсный прототип</span><a href="{% url 'profile' %}#about">О проекте и данных <span aria-hidden="true">↗</span></a></footer>{% endif %}
+    {% if user.is_authenticated %}<footer class="app-footer"><span>Пульс Кампуса · Конкурсный прототип</span><a href="{% url 'student_help' %}">Справочник студента</a><a href="{% url 'profile' %}#about">О проекте и данных <span aria-hidden="true">↗</span></a></footer>{% endif %}
   </div>
   {% if user.is_authenticated %}
   <nav class="mobile-nav" aria-label="Мобильная навигация">

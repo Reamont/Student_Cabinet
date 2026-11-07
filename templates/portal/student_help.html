@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block title %}Справочник студента{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">ПОНЯТНЫЕ СЛЕДУЮЩИЕ ШАГИ</span><h1>Справочник студента</h1><p>Что делать в частых учебных ситуациях.</p></div></div>
+<p class="review-note">Это подсказки для конкурсного прототипа вымышленного РТУ МЕМРЭА. Они описывают действия в этом кабинете.</p>
+<form class="help-search card" method="get" action="{% url 'student_help' %}"><div class="field"><label for="help-query">Найти ситуацию</label><input id="help-query" name="q" type="search" maxlength="120" value="{{ query }}" placeholder="Например, справка или задолженность"></div><button class="button button-primary" type="submit">Найти</button>{% if query %}<a class="text-link" href="{% url 'student_help' %}">Все ситуации</a>{% endif %}</form>
+<div class="help-list">{% for guide in guides %}<details class="card help-item" id="{{ guide.slug }}"><summary>{{ guide.title }}</summary><div><p>{{ guide.body }}</p><a class="button button-outline" href="{{ guide.url }}">{{ guide.action }}</a></div></details>{% empty %}<section class="card empty-state"><h2>Такой ситуации пока нет</h2><p>Попробуй другое слово или выбери тип обращения с помощником.</p><a class="button button-outline" href="{% url 'request_guide' %}">Подобрать обращение</a></section>{% endfor %}</div>
+{% endblock %}

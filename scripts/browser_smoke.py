@@ -201,6 +201,7 @@ with sync_playwright() as playwright:
         if name == 'request-new':
             mobile.locator('#id_destination').fill(destination)
             mobile.locator('#id_text').fill('Длинный вымышленный текст для проверки переноса на мобильном экране.')
+            expect(mobile.locator('[data-draft-status]')).to_contain_text('Черновик сохранён')
             shot(mobile, 'mobile-request.png')
     # Test actual bottom navigation, not only direct routes.
     mobile.locator('.mobile-nav').get_by_role('link', name='Расписание', exact=True).click()

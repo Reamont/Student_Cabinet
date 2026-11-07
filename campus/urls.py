@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.views import LogoutView
 from django.urls import path
-from portal import views
+from portal import views, request_features
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -13,12 +13,18 @@ urlpatterns = [
     path('deadlines/<int:pk>/done/', views.deadline_toggle, name='deadline_toggle'),
     path('requests/', views.requests_list, name='requests'),
     path('requests/new/', views.request_new, name='request_new'),
+    path('requests/guide/', request_features.request_guide, name='request_guide'),
+    path('requests/drafts/save/', request_features.draft_save, name='draft_save'),
+    path('requests/drafts/<uuid:key>/', request_features.draft_edit, name='draft_edit'),
+    path('requests/drafts/<uuid:key>/delete/', request_features.draft_delete, name='draft_delete'),
     path('requests/review/', views.request_review, name='request_review'),
     path('requests/submit/', views.request_submit, name='request_submit'),
     path('requests/<int:pk>/', views.request_detail, name='request_detail'),
+    path('requests/<int:pk>/repeat/', request_features.request_repeat, name='request_repeat'),
     path('requests/<int:pk>/clarify/', views.request_clarify, name='request_clarify'),
     path('notifications/', views.notifications, name='notifications'),
     path('notifications/<int:pk>/', views.notification_detail, name='notification_detail'),
     path('notifications/<int:pk>/read/', views.notification_read, name='notification_read'),
     path('profile/', views.profile, name='profile'),
+    path('help/', request_features.student_help, name='student_help'),
 ]

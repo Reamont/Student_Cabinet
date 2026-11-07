@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Помощник выбора обращения{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'requests' %}">← Мои заявки</a>
+<div class="page-heading"><div><span class="eyebrow">НАЙДЁМ ПОДХОДЯЩУЮ ФОРМУ</span><h1>Какое обращение выбрать?</h1><p>Ответь на пару вопросов — подскажем, с чего начать.</p></div></div>
+<section class="card guide-card">
+{% if kind %}
+  <span class="eyebrow">ПОДХОДЯЩИЙ ВАРИАНТ</span><h2>{{ kind_label }}</h2><p>{{ explanation }}</p>
+  <div class="feature-actions"><a class="button button-primary" href="{% url 'request_new' %}?kind={{ kind }}">Заполнить обращение</a><a class="button button-outline" href="{% url 'request_guide' %}">Начать заново</a></div>
+{% elif purpose == 'certificate' %}
+  <span class="eyebrow">ШАГ 2 ИЗ 2</span><h2>Для чего нужна справка?</h2>
+  <div class="guide-options"><a class="guide-option" href="?purpose=certificate&amp;recipient=general"><strong>Подтвердить, что я учусь</strong><span>Без указания конкретной организации.</span></a><a class="guide-option" href="?purpose=certificate&amp;recipient=organization"><strong>Предъявить в организации</strong><span>Нужна справка для определённого места требования.</span></a></div>
+  <a class="back-link" href="{% url 'request_guide' %}">← К первому вопросу</a>
+{% else %}
+  <span class="eyebrow">ШАГ 1</span><h2>С чем нужна помощь?</h2>
+  <div class="guide-options"><a class="guide-option" href="?purpose=certificate"><strong>Получить справку</strong><span>Подтвердить обучение или предоставить документ организации.</span></a><a class="guide-option" href="?purpose=question"><strong>Обратиться в деканат с вопросом</strong><span>Уточнить учебную ситуацию или попросить проверить сведения.</span></a></div>
+{% endif %}
+</section>
+<p class="card-caption section-spaced">После выбора откроется форма. Обращение отправится только после проверки данных и твоего подтверждения.</p>
+{% endblock %}
