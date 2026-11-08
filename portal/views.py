@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from .forms import ClarificationForm, RequestDraftForm, RequestForm
 from .models import Deadline, LearningResult, Lesson, Notification, Profile, RequestDraft, StudentRequest
 from .services import lock_request_owner, record_status, save_request_draft
+from .learning import study_blocks
 
 
 class StudentLoginView(LoginView):
@@ -82,6 +83,11 @@ def dashboard(request):
     for item in StudentRequest.objects.filter(user=request.user, status='clarify'):
         plan.append({'title': f'{item.number} · Ответьте на уточнение', 'reason': 'Деканату нужны дополнительные сведения',
                      'url': reverse('request_detail', args=[item.pk]), 'kind': 'Заявка'})
+    for block in study_blocks(request.student, today, today):
+        if block.is_valid and not block.deadline.done and block.end > now.time():
+            plan.append({'title': f'{block.start:%H:%M} · {block.deadline.title}',
+                         'reason': 'Ты выбрал эту задачу в «Плане Б»',
+                         'url': reverse('plan_b') + '?date=' + today.isoformat(), 'kind': 'Личный план'})
     return render(request, 'portal/dashboard.html', {
         'nav_section': 'dashboard', 'next_lesson': next_lesson,
         'lessons': [l for l in lessons if l.date == today],

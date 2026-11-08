@@ -1,8 +1,8 @@
 from django import forms
 from django.contrib import admin
 from django.utils import timezone
-from .models import StudentRequest
-from .services import record_status
+from .models import Idea, StudentRequest
+from .services import record_idea_update, record_status
 
 
 class StatusForm(forms.ModelForm):
@@ -50,3 +50,45 @@ class RequestAdmin(admin.ModelAdmin):
 admin.site.site_header = 'Пульс Кампуса · Деканат'
 admin.site.site_title = 'Конкурсный прототип'
 admin.site.index_title = 'Работа с обращениями'
+
+
+class IdeaStatusForm(forms.ModelForm):
+    class Meta:
+        model = Idea
+        fields = ['status', 'response']
+
+    def clean(self):
+        data = super().clean()
+        changed = (data.get('status') != self.initial.get('status') or
+                   data.get('response', '') != self.initial.get('response', ''))
+        if changed and not data.get('response', '').strip():
+            self.add_error('response', 'Объясните решение студентам в публичном ответе.')
+        return data
+
+
+@admin.register(Idea)
+class IdeaAdmin(admin.ModelAdmin):
+    form = IdeaStatusForm
+    fields = ['title', 'description', 'author', 'status', 'response', 'created_at', 'public_history']
+    readonly_fields = ['title', 'description', 'author', 'created_at', 'public_history']
+    list_display = ['title', 'status', 'created_at']
+    list_filter = ['status']
+    search_fields = ['title', 'description']
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description='Публичная история')
+    def public_history(self, obj):
+        return '\n'.join(f'{timezone.localtime(h.created_at):%d.%m.%Y %H:%M} · '
+                         f'{h.get_status_display()} · {h.comment}' for h in obj.history.all())
+
+    def save_model(self, request, obj, form, change):
+        previous = Idea.objects.select_for_update().get(pk=obj.pk)
+        super().save_model(request, obj, form, change)
+        if previous.status != obj.status or previous.response != obj.response:
+            record_idea_update(obj, request.user)

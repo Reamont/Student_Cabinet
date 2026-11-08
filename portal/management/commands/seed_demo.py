@@ -11,18 +11,19 @@ from django.db import transaction
 from django.utils import timezone
 
 from portal.models import (Announcement, Deadline, Discipline, Group, LearningResult,
-                           Lesson, Notification, Profile, RequestHistory, StudentRequest)
+                           Lesson, Notification, Profile, RequestHistory, StudentRequest, Idea, IdeaHistory)
 
 
 SEMESTER_END = date(2026, 12, 31)
 CANCELLED_DEMO_DAY = date(2026, 11, 4)
+PLAN_B_DEMO_DAY = date(2026, 11, 11)
 WEEKDAY_SLOTS = (3, 3, 5, 2, 2, 0, 0)
 
 
 def lesson_values(day, slot, *, legacy=False):
     moved = slot == 1 and day.weekday() in (1, 3)
     cancelled = (slot == 2 and day.weekday() == 4) if legacy else (
-        day == CANCELLED_DEMO_DAY and slot == 4)
+        day in (CANCELLED_DEMO_DAY, PLAN_B_DEMO_DAY) and slot == 4)
     starts = (time(9), time(11, 45) if moved else time(10, 40), time(14), time(15, 50), time(17, 30))
     ends = (time(10, 30), time(13, 15) if moved else time(12, 10), time(15, 30), time(17, 20), time(19))
     return {
@@ -56,8 +57,15 @@ def seed_schedule(group, disciplines, index, monday, today):
         for slot in range(WEEKDAY_SLOTS[day.weekday()]):
             values = lesson_values(day, slot)
             discipline = disciplines[(day.weekday() + slot + index * 3) % len(disciplines)]
-            Lesson.objects.get_or_create(
+            lesson, created = Lesson.objects.get_or_create(
                 group=group, date=day, start=values.pop('start'), discipline=discipline, defaults=values)
+            if not created and day == PLAN_B_DEMO_DAY and slot == 4:
+                # Upgrade only an untouched row from the previous demo timetable.
+                previous = {**values, 'cancelled': False, 'change_note': ''}
+                if all(getattr(lesson, field) == value for field, value in previous.items()):
+                    lesson.cancelled = True
+                    lesson.change_note = values['change_note']
+                    lesson.save(update_fields=['cancelled', 'change_note'])
 
 
 class Command(BaseCommand):
@@ -84,9 +92,10 @@ class Command(BaseCommand):
                 user.set_password(os.environ[variable])
                 user.is_staff = username == 'curator'
                 user.save()
-                if user.is_staff:
-                    user.user_permissions.add(*Permission.objects.filter(
-                        content_type__app_label='portal', codename__in=['view_studentrequest', 'change_studentrequest']))
+            if user.is_staff and username == 'curator':
+                user.user_permissions.add(*Permission.objects.filter(
+                    content_type__app_label='portal', codename__in=[
+                        'view_studentrequest', 'change_studentrequest', 'view_idea', 'change_idea']))
             users.append(user)
         today = timezone.localdate()
         monday = today - timedelta(days=today.weekday())
@@ -144,6 +153,22 @@ class Command(BaseCommand):
                         'среда — 5, четверг и пятница — 2; суббота и воскресенье — выходные. '
                         'Переносы времени и аудитории, а также отдельные отмены явно отмечены у занятий. '
                         'Проверяйте даты и статусы в расписании.'})
+        for index, (title, description, status, response) in enumerate([
+            ('Тихое время приёма в деканате',
+             'Предлагаю выделить время для спокойных консультаций без очереди. Это вымышленный пример для конкурсного прототипа.',
+             'discussion', 'Демо-ответ: обсуждаем формат записи на спокойную консультацию.'),
+            ('Короткая памятка к каждой справке',
+             'Хочется сразу видеть, что проверить перед отправкой справки и как получить результат. Это вымышленное предложение.',
+             'planned', 'Демо-решение: идея включена в план развития конкурсного прототипа.'),
+        ]):
+            item, created = Idea.objects.get_or_create(
+                idempotency_key=uuid.uuid5(uuid.NAMESPACE_URL, f'campus-demo:idea:{index}'),
+                defaults={'author': users[index], 'title': title, 'description': description,
+                          'status': status, 'response': response})
+            if created:
+                IdeaHistory.objects.create(idea=item, status='new', actor=users[index],
+                                           comment='Предложение опубликовано.')
+                IdeaHistory.objects.create(idea=item, status=status, actor=users[2], comment=response)
         self.stdout.write(self.style.SUCCESS(
             'Demo prepared: alisa, maks; staff: curator. Existing passwords and requests preserved. '
             f'Demo schedule ends on {SEMESTER_END:%d.%m.%Y}; existing custom lessons preserved.'))

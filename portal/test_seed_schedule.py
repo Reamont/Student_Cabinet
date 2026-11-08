@@ -39,7 +39,7 @@ class SeedScheduleTests(TestCase):
                 with self.subTest(group=group.name, date=day):
                     lessons = Lesson.objects.filter(group=group, date=day)
                     self.assertEqual(lessons.count(), expected_counts[day.weekday()])
-                    if day != date(2026, 11, 4):
+                    if day not in (date(2026, 11, 4), date(2026, 11, 11)):
                         self.assertFalse(lessons.filter(cancelled=True).exists())
             for weekday in range(5):
                 first = list(Lesson.objects.filter(group=group, date=monday+timedelta(days=weekday))
@@ -47,7 +47,7 @@ class SeedScheduleTests(TestCase):
                 following = list(Lesson.objects.filter(group=group, date=monday+timedelta(days=weekday+7))
                                  .values_list('start', 'end', 'discipline_id', 'kind', 'room', 'teacher'))
                 self.assertEqual(first, following)
-            self.assertEqual(Lesson.objects.filter(group=group, cancelled=True).count(), 1)
+            self.assertEqual(Lesson.objects.filter(group=group, cancelled=True).count(), 2)
         self.assertNotEqual(
             list(Lesson.objects.filter(group=groups[0], date=monday).values_list('discipline_id', flat=True)),
             list(Lesson.objects.filter(group=groups[1], date=monday).values_list('discipline_id', flat=True)),
@@ -109,3 +109,20 @@ class SeedScheduleTests(TestCase):
     def test_initial_seed_after_semester_does_not_invent_future_lessons(self):
         self.seed(date(2027, 1, 4))
         self.assertFalse(Lesson.objects.exists())
+
+    def test_plan_b_demo_cancellation_upgrades_only_untouched_existing_row(self):
+        self.seed()
+        lesson = Lesson.objects.get(group__name='АБВГ-01-02', date=date(2026, 11, 11), start=time(17, 30))
+        lesson.cancelled = False
+        lesson.change_note = ''
+        lesson.save()
+        self.seed()
+        lesson.refresh_from_db()
+        self.assertTrue(lesson.cancelled)
+        lesson.cancelled = False
+        lesson.change_note = 'Собственное изменение занятия'
+        lesson.save()
+        self.seed()
+        lesson.refresh_from_db()
+        self.assertFalse(lesson.cancelled)
+        self.assertEqual(lesson.change_note, 'Собственное изменение занятия')

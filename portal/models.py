@@ -153,6 +153,7 @@ class Notification(models.Model):
         SCHEDULE = 'schedule', 'Расписание'
         DEADLINE = 'deadline', 'Дедлайны'
         REQUEST = 'request', 'Заявки'
+        IDEA = 'idea', 'Предложения'
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     kind = models.CharField(max_length=20, choices=Kind.choices)
@@ -160,6 +161,7 @@ class Notification(models.Model):
     body = models.TextField()
     announcement = models.ForeignKey(Announcement, null=True, blank=True, on_delete=models.CASCADE)
     related_request = models.ForeignKey(StudentRequest, null=True, blank=True, on_delete=models.CASCADE)
+    related_idea = models.ForeignKey('Idea', null=True, blank=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(default=timezone.now)
     read_at = models.DateTimeField(null=True, blank=True)
 
@@ -171,3 +173,64 @@ class LoginThrottle(models.Model):
     key = models.CharField(max_length=64, unique=True)
     failures = models.PositiveIntegerField(default=0)
     started_at = models.DateTimeField(default=timezone.now)
+
+
+class StudyBlock(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)
+    deadline = models.ForeignKey(Deadline, on_delete=models.CASCADE)
+    date = models.DateField()
+    start = models.TimeField()
+    end = models.TimeField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['date', 'start', 'pk']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'lesson', 'date', 'start', 'end'], name='one_task_per_study_window'),
+            models.CheckConstraint(condition=Q(end__gt=models.F('start')), name='study_block_positive_duration'),
+        ]
+
+
+class Idea(models.Model):
+    class Status(models.TextChoices):
+        NEW = 'new', 'На рассмотрении'
+        DISCUSSION = 'discussion', 'Обсуждается'
+        PLANNED = 'planned', 'Запланировано'
+        DONE = 'done', 'Реализовано'
+        REJECTED = 'rejected', 'Отклонено'
+
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    title = models.CharField('Название', max_length=140)
+    description = models.TextField('Предложение', max_length=2000)
+    status = models.CharField('Статус', max_length=12, choices=Status.choices, default=Status.NEW)
+    response = models.TextField('Публичный ответ деканата', max_length=2000, blank=True)
+    created_at = models.DateTimeField('Создано', default=timezone.now)
+    idempotency_key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        verbose_name = 'Предложение'
+        verbose_name_plural = 'Предложения студентов'
+
+    def __str__(self):
+        return self.title
+
+
+class IdeaSupport(models.Model):
+    idea = models.ForeignKey(Idea, on_delete=models.CASCADE, related_name='supports')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['idea', 'user'], name='one_support_per_student')]
+
+
+class IdeaHistory(models.Model):
+    idea = models.ForeignKey(Idea, on_delete=models.CASCADE, related_name='history')
+    status = models.CharField(max_length=12, choices=Idea.Status.choices)
+    comment = models.TextField(max_length=2000)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at', 'pk']

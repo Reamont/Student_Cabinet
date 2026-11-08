@@ -130,7 +130,7 @@ with sync_playwright() as p:
     page.locator('.draft-row').filter(has_text='Заявление в деканат').first.get_by_role('link', name='Продолжить').click()
     expect(page.locator('#id_text')).to_have_value('Я')
     page.goto(BASE + '/help/')
-    page.locator('summary').first.click()
+    page.locator('summary').filter(has_text='Какую справку выбрать?').click()
     expect(page.get_by_role('link', name='Подобрать обращение')).to_be_visible()
     print('PASS without JavaScript: partial draft manual save/resume and help disclosure')
     assert not errors, errors

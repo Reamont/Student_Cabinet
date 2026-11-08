@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.contrib.auth import get_user_model
-from .models import Notification, RequestDraft, RequestHistory, StudentRequest
+from .models import IdeaHistory, Notification, RequestDraft, RequestHistory, StudentRequest
 
 
 def lock_request_owner(user):
@@ -27,3 +27,14 @@ def record_status(item, actor, comment=''):
                                 title=f'{item.number}: {item.get_status_display()}',
                                 body=comment or 'Статус обращения обновлён. Откройте заявку, чтобы узнать подробности.',
                                 related_request=item)
+
+
+@transaction.atomic
+def record_idea_update(item, actor):
+    IdeaHistory.objects.create(idea=item, status=item.status, comment=item.response, actor=actor)
+    recipients = {item.author_id, *item.supports.values_list('user_id', flat=True)}
+    Notification.objects.bulk_create([
+        Notification(user_id=user_id, kind='idea', title=f'{item.title}: {item.get_status_display()}',
+                     body=item.response, related_idea=item)
+        for user_id in recipients
+    ])

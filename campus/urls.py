@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.views import LogoutView
 from django.urls import path
-from portal import views, request_features
+from portal import views, request_features, campus_features
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,4 +27,12 @@ urlpatterns = [
     path('notifications/<int:pk>/read/', views.notification_read, name='notification_read'),
     path('profile/', views.profile, name='profile'),
     path('help/', request_features.student_help, name='student_help'),
+    path('semester/', campus_features.semester, name='semester'),
+    path('plan-b/', campus_features.plan_b, name='plan_b'),
+    path('plan-b/lessons/<int:pk>/choose/', campus_features.plan_pick, name='plan_pick'),
+    path('plan-b/blocks/<int:pk>/remove/', campus_features.plan_remove, name='plan_remove'),
+    path('ideas/', campus_features.ideas, name='ideas'),
+    path('ideas/new/', campus_features.idea_new, name='idea_new'),
+    path('ideas/<int:pk>/', campus_features.idea_detail, name='idea_detail'),
+    path('ideas/<int:pk>/support/', campus_features.idea_support, name='idea_support'),
 ]
