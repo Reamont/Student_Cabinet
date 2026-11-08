@@ -175,6 +175,11 @@ class LoginThrottle(models.Model):
     started_at = models.DateTimeField(default=timezone.now)
 
 
+class ViewPreference(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    values = models.JSONField(default=dict)
+
+
 class StudyBlock(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)

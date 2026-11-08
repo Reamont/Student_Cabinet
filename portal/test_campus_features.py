@@ -83,7 +83,7 @@ class CampusFeatureTests(TestCase):
         for title in [self.db.name, self.task_b.title, 'Закрытое ФИО студента Б']:
             self.assertNotContains(r, title)
         self.assertContains(r, reverse('grades') + f'#result-{self.exam.pk}')
-        self.assertContains(r, reverse('grades') + f'#deadline-{self.task.pk}')
+        self.assertContains(r, reverse('tasks') + f'#deadline-{self.task.pk}')
         self.assertContains(r, '?date=2026-11-11')
         self.assertEqual(r.context['done_tasks'], 1)
         self.assertEqual(r.context['total_tasks'], 2)

@@ -53,7 +53,7 @@ class RequestFeatureTests(TestCase):
         response = self.client.get(reverse('draft_edit', args=[draft.idempotency_key]))
         self.assertContains(response, data['text'])
         self.assertEqual(StudentRequest.objects.count(), 2)
-        self.assertContains(self.client.get(reverse('requests')), 'Продолжить')
+        self.assertContains(self.client.get(reverse('requests'), {'tab': 'drafts'}), 'Продолжить')
 
     def test_draft_accepts_missing_destination_but_review_still_validates_it(self):
         data = self.payload(kind='destination', text='')
@@ -65,7 +65,7 @@ class RequestFeatureTests(TestCase):
 
     def test_manual_save_works_without_javascript(self):
         response = self.client.post(reverse('draft_save'), self.payload(text='Я'))
-        self.assertRedirects(response, reverse('requests'))
+        self.assertRedirects(response, reverse('requests') + '?tab=drafts')
         self.assertEqual(RequestDraft.objects.get().text, 'Я')
 
     def test_review_preserves_latest_snapshot_even_without_autosave(self):
@@ -89,7 +89,7 @@ class RequestFeatureTests(TestCase):
 
     def test_foreign_draft_is_hidden_from_list_edit_and_delete(self):
         draft = RequestDraft.objects.create(user=self.b, kind='application', text='Скрытый черновик')
-        self.assertNotContains(self.client.get(reverse('requests')), draft.text)
+        self.assertNotContains(self.client.get(reverse('requests'), {'tab': 'drafts'}), draft.text)
         self.assertEqual(self.client.get(reverse('draft_edit', args=[draft.idempotency_key])).status_code, 404)
         self.assertEqual(self.client.post(reverse('draft_delete', args=[draft.idempotency_key])).status_code, 404)
         self.assertTrue(RequestDraft.objects.filter(pk=draft.pk).exists())
@@ -117,7 +117,7 @@ class RequestFeatureTests(TestCase):
         draft = RequestDraft.objects.get()
         url = reverse('draft_delete', args=[draft.idempotency_key])
         self.assertEqual(self.client.get(url).status_code, 405)
-        self.assertRedirects(self.client.post(url), reverse('requests'))
+        self.assertRedirects(self.client.post(url), reverse('requests') + '?tab=drafts')
         self.assertFalse(RequestDraft.objects.exists())
 
     def test_resuming_renews_token_but_preserves_submission_identity(self):
@@ -189,5 +189,5 @@ class RequestFeatureTests(TestCase):
 
     def test_draft_user_text_is_escaped(self):
         draft = RequestDraft.objects.create(user=self.a, kind='application', text='<script>alert(1)</script>')
-        for url in [reverse('requests'), reverse('draft_edit', args=[draft.idempotency_key])]:
+        for url in [reverse('requests') + '?tab=drafts', reverse('draft_edit', args=[draft.idempotency_key])]:
             self.assertNotContains(self.client.get(url), draft.text)

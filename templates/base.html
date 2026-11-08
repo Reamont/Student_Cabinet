@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="{% static 'portal/app.css' %}">
   <script src="{% static 'portal/app.js' %}" defer></script>
 </head>
-<body>
+<body{% if user.is_authenticated %} data-viewer="{{ user.pk }}"{% endif %}>
   <svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2m-8 3h2"/></symbol>
@@ -25,6 +25,7 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
     <symbol id="i-exit" viewBox="0 0 24 24"><path d="M9 4H4v16h5m0-8h12m-5-5 5 5-5 5"/></symbol>
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
   </defs></svg>
   <a class="skip-link" href="#main">Перейти к содержимому</a>
   {% if user.is_authenticated %}
@@ -33,38 +34,26 @@
     <div class="sidebar-scroll">
     <div class="university">РТУ МЕМРЭА<span>Цифровое пространство студента</span></div>
     <div class="nav-caption">МОЙ КАМПУС</div>
-    <nav class="side-nav">
-      <a href="{% url 'dashboard' %}" class="{% if nav_section == 'dashboard' %}active{% endif %}" {% if nav_section == 'dashboard' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></a>
-      <a href="{% url 'schedule' %}" class="{% if nav_section == 'schedule' %}active{% endif %}" {% if nav_section == 'schedule' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-calendar"/></svg><span>Расписание</span></a>
-      <a href="{% url 'grades' %}" class="{% if nav_section == 'grades' %}active{% endif %}" {% if nav_section == 'grades' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-chart"/></svg><span>Успеваемость</span></a>
-      <a href="{% url 'requests' %}" class="{% if nav_section == 'requests' %}active{% endif %}" {% if nav_section == 'requests' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-file"/></svg><span>Заявки</span></a>
-      <a href="{% url 'profile' %}" class="{% if nav_section == 'profile' %}active{% endif %}" {% if nav_section == 'profile' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-user"/></svg><span>Профиль</span></a>
-    </nav>
+    <nav class="side-nav">{% include 'portal/_main_links.html' %}</nav>
     <div class="sidebar-note"><span class="live-dot"></span> Всё важное — рядом.<p>Учёба, планы и деканат<br>в одном пространстве.</p></div>
     </div>
     <div class="sidebar-bottom">
       <a class="sidebar-profile" href="{% url 'profile' %}"><span class="avatar">{{ profile.full_name|first|default:'С' }}</span><span><strong>{{ profile.full_name|default:user.username }}</strong><small>{{ profile.group|default:'Сотрудник' }}</small></span></a>
-      <form action="{% url 'logout' %}" method="post">{% csrf_token %}<button class="logout" type="submit"><svg class="icon"><use href="#i-exit"/></svg> Выйти</button></form>
+      <form action="{% url 'logout' %}" method="post" data-clear-ui>{% csrf_token %}<button class="logout" type="submit"><svg class="icon"><use href="#i-exit"/></svg> Выйти</button></form>
     </div>
   </aside>
   {% endif %}
   <div class="{% if user.is_authenticated %}app-shell{% else %}guest-shell{% endif %}">
     {% if user.is_authenticated %}
-    <header class="topbar"><span class="topbar-title">Личный кабинет <span class="topbar-divider">/</span> <span class="muted">Студент</span></span><div class="topbar-actions"><span class="topbar-date">{{ today|date:'j E Y' }} <span>· Москва</span></span><a class="notification-button {% if unread_count %}has-unread{% endif %}" href="{% url 'notifications' %}" aria-label="Уведомления{% if unread_count %}: непрочитанных {{ unread_count }}{% endif %}"><svg class="icon"><use href="#i-bell"/></svg>{% if unread_count %}<span class="notification-count">{{ unread_count }}</span>{% endif %}</a></div></header>
+    <header class="topbar"><span class="topbar-title">Личный кабинет <span class="topbar-divider">/</span> <span class="muted">Студент</span></span><div class="topbar-actions"><span class="topbar-date">{{ today|date:'j E Y' }} <span>· Москва</span></span><a class="notification-button {% if unread_count %}has-unread{% endif %}" href="{% url 'notifications' %}" aria-label="Уведомления{% if unread_count %}: непрочитанных {{ unread_count }}{% endif %}"><svg class="icon"><use href="#i-bell"/></svg>{% if unread_count %}<span class="notification-count">{{ unread_count }}</span>{% endif %}</a><a class="profile-button" href="{% url 'profile' %}" aria-label="Открыть профиль"><span aria-hidden="true">{{ profile.full_name|first|default:'С' }}</span></a></div></header>
     {% endif %}
     <main id="main" class="{% if user.is_authenticated %}main-content{% endif %}" tabindex="-1">
       {% if demo_period %}<div class="demo-period">Демонстрационные данные · {{ demo_period.start|date:'d.m.Y' }} — {{ demo_period.end|date:'d.m.Y' }} · время Москвы{% if demo_period.expired %}<p>Демонстрационный период завершён. Занятия за этот период доступны в расписании.</p><a class="back-link" href="{% url 'schedule' %}?mode=week&amp;date={{ demo_period.start|date:'Y-m-d' }}">Открыть расписание демонстрационного периода →</a>{% endif %}</div>{% endif %}
       {% if messages %}<div class="messages" aria-live="polite">{% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
       {% block content %}{% endblock %}
     </main>
-    {% if user.is_authenticated %}<footer class="app-footer"><span>Пульс Кампуса · Конкурсный прототип</span><a href="{% url 'student_help' %}">Справочник студента</a><a href="{% url 'profile' %}#about">О проекте и данных <span aria-hidden="true">↗</span></a></footer>{% endif %}
+    {% if user.is_authenticated %}<footer class="app-footer"><span>Пульс Кампуса · Конкурсный прототип</span><a href="{% url 'student_help' %}">Справочник студента</a><a href="{% url 'about' %}">О проекте и данных</a></footer>{% endif %}
   </div>
   {% if user.is_authenticated %}
-  <nav class="mobile-nav" aria-label="Мобильная навигация">
-    <a href="{% url 'dashboard' %}" class="{% if nav_section == 'dashboard' %}active{% endif %}" {% if nav_section == 'dashboard' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></a>
-    <a href="{% url 'schedule' %}" class="{% if nav_section == 'schedule' %}active{% endif %}" {% if nav_section == 'schedule' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-calendar"/></svg><span>Расписание</span></a>
-    <a href="{% url 'grades' %}" class="{% if nav_section == 'grades' %}active{% endif %}" {% if nav_section == 'grades' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-chart"/></svg><span>Оценки</span></a>
-    <a href="{% url 'requests' %}" class="{% if nav_section == 'requests' %}active{% endif %}" {% if nav_section == 'requests' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-file"/></svg><span>Заявки</span></a>
-    <a href="{% url 'profile' %}" class="{% if nav_section == 'profile' %}active{% endif %}" {% if nav_section == 'profile' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-user"/></svg><span>Профиль</span></a>
-  </nav>{% endif %}
+  <nav class="mobile-nav" aria-label="Мобильная навигация">{% include 'portal/_main_links.html' %}</nav>{% endif %}
 </body></html>

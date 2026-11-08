@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Учёба{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">ВСЁ ДЛЯ УЧЕБНОГО РИТМА</span><h1>Учёба</h1><p>Посмотри результаты, выбери следующую задачу или открой карту семестра.</p></div></div>
+<div class="destination-grid study-cards"><a class="card destination" href="{% url 'grades' %}"><svg class="icon"><use href="#i-chart"/></svg><h2>Успеваемость</h2><p>Оценки, зачёты и экзамены. Записей по дисциплинам: {{ result_count }}.</p><span>Открыть результаты →</span></a><a class="card destination" href="{% url 'tasks' %}"><svg class="icon"><use href="#i-check"/></svg><h2>Учебные задачи</h2><p>Сроки и отметки выполнения. Незавершённых задач: {{ unfinished }}.</p><span>Выбрать задачу →</span></a><a class="card destination" href="{% url 'semester' %}"><svg class="icon"><use href="#i-calendar"/></svg><h2>Мой семестр</h2><p>Занятия, задачи, экзамены и личный план по датам.</p><span>Открыть карту →</span></a></div>
+{% endblock %}

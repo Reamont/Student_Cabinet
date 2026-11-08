@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.views.decorators.http import require_GET, require_POST
+from django.urls import reverse
 
 from .forms import RequestDraftForm, RequestForm
 from .guidance import student_guides
@@ -29,8 +30,8 @@ def draft_save(request):
         return redirect('requests')
     if wants_json:
         return JsonResponse({'saved': True, 'updated_at': draft.updated_at.isoformat()})
-    messages.success(request, 'Черновик сохранён. Продолжить можно в разделе «Заявки».')
-    return redirect('requests')
+    messages.success(request, 'Черновик сохранён. Продолжить можно во вкладке «Черновики» раздела «Заявки».')
+    return redirect(reverse('requests') + '?tab=drafts')
 
 
 @student_required
@@ -49,7 +50,7 @@ def draft_delete(request, key):
     draft = get_object_or_404(RequestDraft, idempotency_key=key, user=request.user)
     draft.delete()
     messages.success(request, 'Черновик удалён.')
-    return redirect('requests')
+    return redirect(reverse('requests') + '?tab=drafts')
 
 
 @student_required
@@ -94,4 +95,4 @@ def student_help(request):
     if query:
         guides = [g for g in guides if query.casefold() in (g['title'] + ' ' + g['body']).casefold()]
     return render(request, 'portal/student_help.html', {
-        'nav_section': 'help', 'guides': guides, 'query': query})
+        'nav_section': 'more', 'guides': guides, 'query': query})

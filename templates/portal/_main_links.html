@@ -1,0 +1,5 @@
+<a href="{% url 'dashboard' %}" class="{% if nav_section == 'dashboard' %}active{% endif %}" {% if nav_section == 'dashboard' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></a>
+<a href="{% url 'schedule' %}" class="{% if nav_section == 'schedule' %}active{% endif %}" {% if nav_section == 'schedule' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-calendar"/></svg><span>Расписание</span></a>
+<a href="{% url 'study' %}" class="{% if nav_section == 'study' %}active{% endif %}" {% if nav_section == 'study' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-chart"/></svg><span>Учёба</span></a>
+<a href="{% url 'requests' %}" class="{% if nav_section == 'requests' %}active{% endif %}" {% if nav_section == 'requests' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-file"/></svg><span>Заявки</span></a>
+<a href="{% url 'more' %}" class="{% if nav_section == 'more' %}active{% endif %}" {% if nav_section == 'more' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-more"/></svg><span>Ещё</span></a>

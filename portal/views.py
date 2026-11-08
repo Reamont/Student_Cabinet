@@ -16,6 +16,7 @@ from .forms import ClarificationForm, RequestDraftForm, RequestForm
 from .models import Deadline, LearningResult, Lesson, Notification, Profile, RequestDraft, StudentRequest
 from .services import lock_request_owner, record_status, save_request_draft
 from .learning import study_blocks
+from .experience import view_option
 
 
 class StudentLoginView(LoginView):
@@ -79,7 +80,7 @@ def dashboard(request):
     for deadline in Deadline.objects.filter(user=request.user, done=False, due__date__lte=today).select_related('discipline'):
         if timezone.localtime(deadline.due).date() <= today:
             plan.append({'title': deadline.title, 'reason': 'Срок прошёл — проверьте выполнение' if deadline.due < now else 'Срок сегодня',
-                         'url': reverse('grades') + f'#deadline-{deadline.pk}', 'kind': 'Дедлайн'})
+                         'url': reverse('tasks') + f'#deadline-{deadline.pk}', 'kind': 'Дедлайн'})
     for item in StudentRequest.objects.filter(user=request.user, status='clarify'):
         plan.append({'title': f'{item.number} · Ответьте на уточнение', 'reason': 'Деканату нужны дополнительные сведения',
                      'url': reverse('request_detail', args=[item.pk]), 'kind': 'Заявка'})
@@ -88,12 +89,32 @@ def dashboard(request):
             plan.append({'title': f'{block.start:%H:%M} · {block.deadline.title}',
                          'reason': 'Ты выбрал эту задачу в «Плане Б»',
                          'url': reverse('plan_b') + '?date=' + today.isoformat(), 'kind': 'Личный план'})
+    clarification = StudentRequest.objects.filter(user=request.user, status='clarify').first()
+    overdue = Deadline.objects.filter(user=request.user, done=False, due__lt=now).order_by('due').first()
+    debts = LearningResult.objects.filter(user=request.user, state='debt').select_related('discipline')
+    next_action = None
+    if clarification:
+        next_action = {'title': 'Ответить на уточнение', 'reason': f'По заявке {clarification.number} нужны дополнительные сведения.',
+                       'url': reverse('request_detail', args=[clarification.pk]) + '#clarification', 'button': 'Ответить на уточнение'}
+    elif overdue:
+        next_action = {'title': overdue.title, 'reason': 'Срок прошёл. Проверь, что ещё нужно сделать.',
+                       'url': reverse('tasks') + f'#deadline-{overdue.pk}', 'button': 'Открыть задачу'}
+    elif deadlines:
+        next_action = {'title': deadlines[0].title, 'reason': 'Ближайший срок: ' + timezone.localtime(deadlines[0].due).strftime('%d.%m, %H:%M'),
+                       'url': reverse('tasks') + f'#deadline-{deadlines[0].pk}', 'button': 'Открыть задачу'}
+    elif debts:
+        result = debts[0]
+        next_action = {'title': result.discipline.name, 'reason': 'Есть академическая задолженность. Прочитай комментарий по дисциплине.',
+                       'url': reverse('grades') + f'#result-{result.pk}', 'button': 'Посмотреть результат'}
     return render(request, 'portal/dashboard.html', {
         'nav_section': 'dashboard', 'next_lesson': next_lesson,
         'lessons': [l for l in lessons if l.date == today],
         'changed_lessons': [l for l in lessons if l.cancelled or l.old_start or l.old_room][:3],
         'deadlines': deadlines, 'active_requests': active, 'plan': plan,
-        'results_attention': LearningResult.objects.filter(user=request.user, state='debt').select_related('discipline'),
+        'results_attention': debts, 'next_action': next_action,
+        'first_name': request.student.full_name.split()[0] if request.student.full_name.strip() else request.user.username,
+        'other_actions': [entry for entry in plan if entry['kind'] != 'Занятие' and
+                          (not next_action or entry['url'] not in (next_action['url'], next_action['url'].split('#')[0]))][:3],
         'average': average_for(request.user),
     })
 
@@ -106,7 +127,7 @@ def schedule(request):
             raise ValueError
     except (ValueError, TypeError):
         selected = timezone.localdate()
-    mode = 'week' if request.GET.get('mode') == 'week' else 'today'
+    mode = view_option(request, 'schedule_mode', 'mode', 'today')
     week_start = selected - timedelta(days=selected.weekday())
     start = week_start if mode == 'week' else selected
     end = start + timedelta(days=6) if mode == 'week' else start
@@ -115,12 +136,13 @@ def schedule(request):
             for i in range(7 if mode == 'week' else 1)]
     delta = timedelta(days=7 if mode == 'week' else 1)
     return render(request, 'portal/schedule.html', {'nav_section': 'schedule', 'mode': mode, 'days': days,
-        'selected_date': selected, 'week_start': week_start, 'prev_date': selected-delta, 'next_date': selected+delta})
+        'selected_date': selected, 'week_start': week_start, 'prev_date': selected-delta, 'next_date': selected+delta,
+        'view_memory': {'schedule_mode': mode}})
 
 
 @student_required
 def grades(request):
-    return render(request, 'portal/grades.html', {'nav_section': 'grades',
+    return render(request, 'portal/grades.html', {'nav_section': 'study',
         'results': LearningResult.objects.filter(user=request.user).select_related('discipline'),
         'average': average_for(request.user),
         'deadlines': Deadline.objects.filter(user=request.user).select_related('discipline')})
@@ -134,14 +156,26 @@ def deadline_toggle(request, pk):
         deadline.done = request.POST.get('done') == '1'
         deadline.save(update_fields=['done'])
     messages.success(request, 'Отметка об учебной задаче сохранена.')
+    if request.POST.get('return_to') == 'tasks':
+        return redirect(reverse('tasks') + f'#deadline-{pk}')
     return redirect('grades')
 
 
 @student_required
 def requests_list(request):
+    tab = view_option(request, 'requests_tab', 'tab', 'active')
+    items = StudentRequest.objects.filter(user=request.user)
+    counts = {'active': items.exclude(status__in=['ready', 'rejected']).count(),
+              'history': items.filter(status__in=['ready', 'rejected']).count(),
+              'drafts': RequestDraft.objects.filter(user=request.user).count()}
+    if tab == 'history':
+        items = items.filter(status__in=['ready', 'rejected'])
+    else:
+        items = items.exclude(status__in=['ready', 'rejected'])
     return render(request, 'portal/requests.html', {'nav_section': 'requests',
-        'student_requests': StudentRequest.objects.filter(user=request.user),
-        'drafts': RequestDraft.objects.filter(user=request.user)})
+        'student_requests': items, 'selected_tab': tab, 'counts': counts,
+        'drafts': RequestDraft.objects.filter(user=request.user) if tab == 'drafts' else RequestDraft.objects.none(),
+        'view_memory': {'requests_tab': tab}})
 
 
 @student_required
@@ -198,6 +232,7 @@ def request_submit(request):
 def request_detail(request, pk):
     item = get_object_or_404(StudentRequest.objects.prefetch_related('history'), pk=pk, user=request.user)
     return render(request, 'portal/request_detail.html', {'nav_section': 'requests', 'item': item,
+        'clarification_note': item.history.filter(status='clarify').last() if item.status == 'clarify' else None,
         'clarification_form': ClarificationForm() if item.status == 'clarify' else None})
 
 
@@ -212,7 +247,7 @@ def request_clarify(request, pk):
             return redirect('request_detail', pk=pk)
         if not form.is_valid():
             return render(request, 'portal/request_detail.html', {'nav_section': 'requests', 'item': item,
-                'clarification_form': form}, status=422)
+                'clarification_form': form, 'clarification_note': item.history.filter(status='clarify').last()}, status=422)
         item.status = 'sent'
         item.save(update_fields=['status'])
         record_status(item, request.user, 'Ответ студента: ' + form.cleaned_data['text'])
@@ -223,16 +258,17 @@ def request_clarify(request, pk):
 @student_required
 def notifications(request):
     items = Notification.objects.filter(user=request.user)
-    kind = request.GET.get('kind', '')
+    kind = view_option(request, 'notifications_kind', 'kind', '')
     if kind in dict(Notification.Kind.choices):
         items = items.filter(kind=kind)
     else:
         kind = ''
-    unread_only = request.GET.get('unread') == '1'
+    unread_only = view_option(request, 'notifications_unread', 'unread', '0') == '1'
     if unread_only:
         items = items.filter(read_at__isnull=True)
     return render(request, 'portal/notifications.html', {'nav_section': 'notifications', 'notifications': items,
-        'kinds': Notification.Kind.choices, 'selected_kind': kind, 'unread_only': unread_only})
+        'kinds': Notification.Kind.choices, 'selected_kind': kind, 'unread_only': unread_only,
+        'view_memory': {'notifications_kind': kind, 'notifications_unread': '1' if unread_only else '0'}})
 
 
 @student_required
@@ -254,4 +290,4 @@ def notification_read(request, pk):
 
 @student_required
 def profile(request):
-    return render(request, 'portal/profile.html', {'nav_section': 'profile'})
+    return render(request, 'portal/profile.html', {'nav_section': 'more'})

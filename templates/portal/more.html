@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Ещё{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">ТВОЙ КАБИНЕТ И КАМПУС</span><h1>Ещё</h1><p>Личные данные, полезные ответы и участие в жизни кампуса.</p></div></div>
+<div class="destination-grid"><a class="card destination" href="{% url 'profile' %}"><svg class="icon"><use href="#i-user"/></svg><h2>Профиль</h2><p>Твои учебные данные, группа и студенческий билет.</p></a><a class="card destination" href="{% url 'ideas' %}"><svg class="icon"><use href="#i-spark"/></svg><h2>Идеи для деканата</h2><p>Предлагай улучшения, поддерживай идеи и следи за решением.</p></a><a class="card destination" href="{% url 'student_help' %}"><svg class="icon"><use href="#i-file"/></svg><h2>Справочник студента</h2><p>Ответы на частые вопросы и переходы к нужным действиям.</p></a><a class="card destination" href="{% url 'about' %}"><svg class="icon"><use href="#i-more"/></svg><h2>О проекте и данных</h2><p>Что представляет собой прототип и как устроены его данные.</p></a></div>
+{% endblock %}

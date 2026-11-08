@@ -19,11 +19,11 @@ for line in (ROOT / 'var/dev.env').read_text().splitlines():
     credentials[key] = shlex.split(value)[0]
 
 
-def login(page, username, variable):
-    page.goto(BASE + '/login/')
+def login(page, username, variable, staff=False):
+    page.goto(BASE + ('/admin/login/' if staff else '/login/'))
     page.locator('#id_username').fill(username)
     page.locator('#id_password').fill(credentials[variable])
-    page.get_by_role('button', name='Войти в кабинет').click()
+    page.locator('button[type=submit],input[type=submit]').first.click()
     page.wait_for_load_state('networkidle')
     assert '/login/' not in page.url
 
@@ -42,7 +42,7 @@ with sync_playwright() as p:
         page = context.new_page()
         page.on('pageerror', lambda e: errors.append(str(e)))
         login(page, 'alisa', 'DEMO_STUDENT_PASSWORD')
-        page.goto(BASE + '/requests/')
+        page.goto(BASE + '/requests/new/')
         page.get_by_role('link', name='Помочь выбрать обращение').click()
         page.get_by_role('link', name=re.compile('Получить справку')).click()
         page.get_by_role('link', name=re.compile('Предъявить в организации')).click()
@@ -58,7 +58,7 @@ with sync_playwright() as p:
         page.goto(BASE + '/profile/')
         page.locator('main').get_by_role('button', name='Выйти', exact=True).click()
         login(page, 'alisa', 'DEMO_STUDENT_PASSWORD')
-        page.goto(BASE + '/requests/')
+        page.goto(BASE + '/requests/?tab=drafts')
         page.locator('.draft-row').filter(has_text=destination).get_by_role('link', name='Продолжить').click()
         draft_url = page.url
         expect(page.locator('#id_destination')).to_have_value(destination)
@@ -75,6 +75,8 @@ with sync_playwright() as p:
         expect(page.locator('[data-draft-status]')).to_contain_text('Сохранение временно недоступно.')
         expect(page.locator('#id_text')).to_have_value(text)
         page.unroute('**/requests/drafts/save/', fail_save)
+        page.get_by_role('button', name='Повторить сохранение', exact=True).click()
+        expect(page.locator('[data-draft-status]')).to_contain_text('Черновик сохранён')
         page.get_by_role('button', name='Сохранить черновик и выйти').click()
         page.locator('.draft-row').filter(has_text=destination).get_by_role('link', name='Продолжить').click()
         expect(page.locator('#id_text')).to_have_value(text)
@@ -84,6 +86,18 @@ with sync_playwright() as p:
         page.wait_for_url(re.compile(r'/requests/\d+/$'))
         original_url = page.url
         expect(page.locator('.badge-large')).to_have_text('Отправлена')
+        # Repeating is offered when the employee has finished the original request.
+        staff_context = browser.new_context()
+        staff = staff_context.new_page()
+        login(staff, 'curator', 'DEMO_STAFF_PASSWORD', staff=True)
+        original_pk = re.search(r'/requests/(\d+)/', original_url).group(1)
+        staff.goto(BASE + f'/admin/portal/studentrequest/{original_pk}/change/')
+        staff.locator('#id_status').select_option('ready')
+        staff.locator('#id_comment').fill('Демонстрационная справка готова.')
+        staff.locator('input[name="_continue"]').click()
+        staff_context.close()
+        page.reload()
+        expect(page.locator('.badge-large')).to_have_text('Готова')
         page.get_by_role('link', name='Повторить заявку', exact=True).click()
         expect(page.locator('#id_destination')).to_have_value(destination)
         expect(page.locator('#id_text')).to_have_value(text)
@@ -94,7 +108,7 @@ with sync_playwright() as p:
         page.wait_for_url(re.compile(r'/requests/\d+/$'))
         assert page.url != original_url
         expect(page.locator('.badge-large')).to_have_text('Отправлена')
-        page.goto(BASE + '/requests/')
+        page.goto(BASE + '/requests/?tab=drafts')
         expect(page.locator('.draft-row').filter(has_text=destination)).to_have_count(0)
         print(f'PASS {width}px: guide, autosave, relogin/resume, failure/manual save, submit, repeat')
 
@@ -121,11 +135,12 @@ with sync_playwright() as p:
         other_context.close()
         context.close()
 
-    no_js = browser.new_context(java_script_enabled=False, viewport={'width': 360, 'height': 800})
+    no_js = browser.new_context(java_script_enabled=False, reduced_motion='reduce', viewport={'width': 360, 'height': 800})
     page = no_js.new_page()
     login(page, 'alisa', 'DEMO_STUDENT_PASSWORD')
     page.goto(BASE + '/requests/new/?kind=application')
     page.locator('#id_text').fill('Я')
+    page.mouse.wheel(0, 400)
     page.get_by_role('button', name='Сохранить черновик и выйти').click()
     page.locator('.draft-row').filter(has_text='Заявление в деканат').first.get_by_role('link', name='Продолжить').click()
     expect(page.locator('#id_text')).to_have_value('Я')

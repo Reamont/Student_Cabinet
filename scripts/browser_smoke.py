@@ -104,7 +104,7 @@ with sync_playwright() as playwright:
     record('Недельное расписание показывает переносы и прежние значения')
     today = datetime.now(ZoneInfo('Europe/Moscow')).date()
     sunday = today + timedelta(days=(6-today.weekday()) % 7)
-    page.goto(BASE + '/schedule/?date=' + sunday.isoformat())
+    page.goto(BASE + '/schedule/?mode=today&date=' + sunday.isoformat())
     expect(page.locator('.empty-state')).to_be_visible()
     record('Пустой выходной день отображается явно')
     page.goto(BASE + '/grades/')
@@ -206,7 +206,7 @@ with sync_playwright() as playwright:
     # Test actual bottom navigation, not only direct routes.
     mobile.locator('.mobile-nav').get_by_role('link', name='Расписание', exact=True).click()
     expect(mobile.get_by_role('heading', name='Расписание', exact=True)).to_be_visible()
-    mobile.locator('.mobile-nav').get_by_role('link', name='Профиль', exact=True).click()
+    mobile.get_by_role('link', name='Открыть профиль', exact=True).click()
     mobile.locator('main').get_by_role('button', name='Выйти', exact=True).click()
     mobile.goto(BASE + '/profile/')
     assert '/login/' in mobile.url

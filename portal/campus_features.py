@@ -17,6 +17,8 @@ from .learning import free_windows, study_blocks, window_is_future, window_key
 from .models import (Deadline, Idea, IdeaHistory, IdeaSupport, LearningResult, Lesson,
                      StudyBlock)
 from .views import student_required
+from .experience import view_option
+from .plan_undo import read_plan_undo
 
 
 def selected_day(value):
@@ -44,7 +46,7 @@ def month_start(value):
 def semester(request):
     first = month_start(request.GET.get('month', ''))
     last = first.replace(day=calendar.monthrange(first.year, first.month)[1])
-    kind = request.GET.get('kind', '')
+    kind = view_option(request, 'semester_kind', 'kind', '')
     if kind not in ('lessons', 'tasks', 'exams', 'plan'):
         kind = ''
     events = defaultdict(list)
@@ -68,7 +70,7 @@ def semester(request):
             events[day].append({'title': task.title, 'label': 'Учебная задача',
                 'detail': task.discipline.name + ' · ' + timezone.localtime(task.due).strftime('%H:%M') +
                           (' · Выполнено' if task.done else ' · Срок прошёл' if late else ' · Предстоит'),
-                'url': reverse('grades') + f'#deadline-{task.pk}', 'done': task.done})
+                'url': reverse('tasks') + f'#deadline-{task.pk}', 'done': task.done})
     results = list(LearningResult.objects.filter(user=request.user).select_related('discipline'))
     if kind in ('', 'exams'):
         for result in results:
@@ -88,15 +90,16 @@ def semester(request):
     period = Lesson.objects.filter(group=request.student.group).aggregate(start=Min('date'), end=Max('date'))
     counts = Counter(result.state for result in results)
     return render(request, 'portal/semester.html', {
-        'nav_section': 'semester', 'month': first, 'prev_month': (first - timedelta(days=1)).replace(day=1),
+        'nav_section': 'study', 'month': first, 'prev_month': (first - timedelta(days=1)).replace(day=1),
         'next_month': (last + timedelta(days=1)), 'weeks': weeks, 'selected_kind': kind,
         'days': [{'date': day, 'events': items} for day, items in sorted(events.items())],
         'period': period, 'done_tasks': sum(task.done for task in tasks), 'total_tasks': len(tasks),
         'graded': counts['grade'], 'passed': counts['pass'], 'debts': counts['debt'],
+        'view_memory': {'semester_kind': kind},
     })
 
 
-def plan_b_context(request, day, error=''):
+def plan_b_context(request, day, error='', bound_form=None, bound_lesson=None):
     windows = free_windows(request.student, day)
     blocks = study_blocks(request.student, day, day)
     tasks = list(Deadline.objects.filter(user=request.user, done=False).select_related('discipline'))
@@ -109,12 +112,19 @@ def plan_b_context(request, day, error=''):
             auto_id=f"window-{window['lesson'].pk}-{window['start']:%H%M}-%s", initial={
             'start': window['start'].strftime('%H:%M'), 'end': window['end'].strftime('%H:%M'),
             'deadline': window['block'].deadline_id if window['block'] and not window['block'].deadline.done else None})
+        if (bound_form is not None and bound_lesson == window['lesson'].pk and
+                bound_form.cleaned_data.get('start') == window['start'] and
+                bound_form.cleaned_data.get('end') == window['end']):
+            bound_form.auto_id = window['form'].auto_id
+            window['form'] = bound_form
         window['suggestions'] = tasks[:3]
     cancelled = Lesson.objects.filter(group=request.student.group, cancelled=True)
     future = list(cancelled.filter(date__gte=timezone.localdate()).order_by('date', 'start')[:5])
     past = list(cancelled.filter(date__lt=timezone.localdate()).order_by('-date', 'start')[:3])
-    return {'nav_section': 'plan_b', 'day': day, 'windows': windows, 'error': error,
+    undo = read_plan_undo(request)
+    return {'nav_section': 'schedule', 'day': day, 'windows': windows, 'error': error,
             'has_tasks': bool(tasks), 'known_cancellations': future + past,
+            'undo': undo if undo and undo['date'] == day else None,
             'invalid_blocks': [block for block in blocks if not block.is_valid]}
 
 
@@ -150,21 +160,58 @@ def plan_pick(request, pk):
                 if not others.exists():
                     StudyBlock.objects.update_or_create(user=request.user, lesson=lesson, date=lesson.date,
                         start=start, end=end, defaults={'deadline': form.cleaned_data['deadline']})
-                    messages.success(request, 'Задача добавлена в личный план. Её можно открыть в «Моём семестре».')
+                    task = form.cleaned_data['deadline']
+                    messages.success(request, f'«{task.title}» — в личном плане на {lesson.date:%d.%m}, '
+                                             f'{start:%H:%M}–{end:%H:%M}. Выполнение задачи отмечается отдельно.')
                     return redirect(reverse('plan_b') + '?date=' + lesson.date.isoformat())
                 error = 'На это время уже выбрана другая задача. Сначала убери её из плана.'
             else:
                 error = 'Окно уже началось или расписание изменилось. Проверь доступное время заново.'
-    return render(request, 'portal/plan_b.html', plan_b_context(request, lesson.date, error), status=422)
+    return render(request, 'portal/plan_b.html', plan_b_context(request, lesson.date, error, form, lesson.pk), status=422)
 
 
 @student_required
 @require_POST
 def plan_remove(request, pk):
-    block = get_object_or_404(StudyBlock, pk=pk, user=request.user)
-    day = block.date
-    block.delete()
+    with transaction.atomic():
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        block = get_object_or_404(StudyBlock.objects.select_for_update(), pk=pk, user=request.user)
+        day = block.date
+        request.session['study_undo'] = {
+            'user': request.user.pk, 'lesson': block.lesson_id, 'deadline': block.deadline_id,
+            'date': day.isoformat(), 'start': block.start.isoformat(), 'end': block.end.isoformat(),
+            'expires': timezone.now().timestamp() + 120,
+        }
+        block.delete()
     messages.success(request, 'Задача убрана из этого окна. Учебное обязательство сохранено.')
+    return redirect(reverse('plan_b') + '?date=' + day.isoformat())
+
+
+@student_required
+@require_POST
+def plan_restore(request):
+    with transaction.atomic():
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        undo = read_plan_undo(request)
+        if undo is None:
+            messages.info(request, 'Вернуть задачу уже нельзя. При необходимости выбери её в доступном окне заново.')
+            return redirect('plan_b')
+        day, start, end = undo['date'], undo['start'], undo['end']
+        exists = any(window_key(w['lesson'].pk, w['start'], w['end']) ==
+                     window_key(undo['lesson'].pk, start, end) for w in free_windows(request.student, day))
+        overlap = StudyBlock.objects.filter(user=request.user, date=day, start__lt=end, end__gt=start)
+        same = overlap.filter(lesson=undo['lesson'], start=start, end=end, deadline=undo['task']).first()
+        if same:
+            request.session.pop('study_undo', None)
+            messages.info(request, 'Задача уже есть в личном плане.')
+            return redirect(reverse('plan_b') + '?date=' + day.isoformat())
+        if not exists or not window_is_future(day, start) or undo['task'].done or overlap.exists():
+            return render(request, 'portal/plan_b.html', plan_b_context(request, day,
+                'Вернуть задачу не получилось: расписание, задача или личный план изменились. Выбери доступное окно.'), status=422)
+        StudyBlock.objects.create(user=request.user, lesson=undo['lesson'], deadline=undo['task'],
+                                  date=day, start=start, end=end)
+        request.session.pop('study_undo', None)
+    messages.success(request, f'«{undo["task"].title}» возвращена в личный план на {day:%d.%m}, {start:%H:%M}–{end:%H:%M}.')
     return redirect(reverse('plan_b') + '?date=' + day.isoformat())
 
 
@@ -177,16 +224,18 @@ def idea_queryset(user):
 @require_GET
 def ideas(request):
     items = idea_queryset(request.user)
-    status = request.GET.get('status', '')
+    status = view_option(request, 'ideas_status', 'status', '')
     if status in dict(Idea.Status.choices):
         items = items.filter(status=status)
     else:
         status = ''
-    popular = request.GET.get('sort') == 'popular'
+    sort = view_option(request, 'ideas_sort', 'sort', 'new')
+    popular = sort == 'popular'
     if popular:
         items = items.order_by('-support_count', '-created_at', '-pk')
-    return render(request, 'portal/ideas.html', {'nav_section': 'ideas', 'ideas': items,
-        'statuses': Idea.Status.choices, 'selected_status': status, 'popular': popular})
+    return render(request, 'portal/ideas.html', {'nav_section': 'more', 'ideas': items,
+        'statuses': Idea.Status.choices, 'selected_status': status, 'popular': popular,
+        'view_memory': {'ideas_status': status, 'ideas_sort': sort}})
 
 
 @student_required
@@ -216,14 +265,14 @@ def idea_new(request):
                     return redirect('idea_detail', pk=item.pk)
         else:
             status = 422
-    return render(request, 'portal/idea_form.html', {'nav_section': 'ideas', 'form': form}, status=status)
+    return render(request, 'portal/idea_form.html', {'nav_section': 'more', 'form': form}, status=status)
 
 
 @student_required
 @require_GET
 def idea_detail(request, pk):
     item = get_object_or_404(idea_queryset(request.user).prefetch_related('history'), pk=pk)
-    return render(request, 'portal/idea_detail.html', {'nav_section': 'ideas', 'idea': item,
+    return render(request, 'portal/idea_detail.html', {'nav_section': 'more', 'idea': item,
                                                     'is_owner': item.author_id == request.user.pk})
 
 

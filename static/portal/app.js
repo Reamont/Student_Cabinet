@@ -29,6 +29,7 @@ if (errorField) errorField.focus();
 
 document.querySelectorAll('[data-draft-form]').forEach((form) => {
   const status = form.querySelector('[data-draft-status]');
+  const retry = form.querySelector('[data-draft-retry]');
   status.textContent += ' Изменения сохраняются автоматически.';
   let timer;
   let inFlight = null;
@@ -39,6 +40,7 @@ document.querySelectorAll('[data-draft-form]').forEach((form) => {
   const save = () => {
     if (leaving || inFlight || revision === savedRevision) return;
     const snapshot = revision;
+    if (retry) retry.hidden = true;
     status.textContent = 'Сохраняем черновик…';
     status.classList.remove('is-error');
     inFlight = fetch(form.dataset.draftUrl, {
@@ -59,11 +61,14 @@ document.querySelectorAll('[data-draft-form]').forEach((form) => {
       const message = error instanceof TypeError ? 'Не удалось сохранить черновик. Проверь соединение.' : error.message;
       status.textContent = message + ' Текст остаётся в форме. Можно сохранить кнопкой ниже.';
       status.classList.add('is-error');
+      if (retry) retry.hidden = false;
     }).finally(() => {
       inFlight = null;
       if (!leaving && revision !== snapshot) timer = setTimeout(save, 500);
     });
   };
+
+  retry?.addEventListener('click', () => { clearTimeout(timer); save(); });
 
   form.addEventListener('input', (event) => {
     if (!['kind', 'destination', 'text'].includes(event.target.name)) return;
@@ -108,3 +113,70 @@ const revealHelpTopic = () => {
 };
 revealHelpTopic();
 window.addEventListener('hashchange', revealHelpTopic);
+
+document.querySelectorAll('[data-view-memory]').forEach((form) => {
+  const button = form.querySelector('[data-memory-retry]');
+  const status = form.querySelector('[data-memory-status]');
+  let pending = false;
+  const remember = async () => {
+    if (pending) return;
+    pending = true;
+    button.hidden = true;
+    status.textContent = '';
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST', body: new FormData(form), credentials: 'same-origin', keepalive: true,
+        headers: {Accept: 'application/json'},
+      });
+      if (response.redirected || !response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+        throw new Error('not saved');
+      }
+      const result = await response.json();
+      if (!result.saved) throw new Error('not saved');
+      status.textContent = 'Вид сохранён';
+    } catch {
+      status.textContent = 'Не удалось запомнить вид. Выбранные фильтры продолжают работать.';
+      button.textContent = 'Повторить сохранение вида';
+      button.hidden = false;
+    } finally {
+      pending = false;
+    }
+  };
+  form.addEventListener('submit', (event) => { event.preventDefault(); remember(); });
+  remember();
+});
+
+// Only numeric scroll positions are stored in this tab, separately per account.
+const viewer = document.body.dataset.viewer;
+const list = document.querySelector('[data-list-state]');
+let clearingPosition = false;
+if (viewer && list) {
+  const key = `student-position:${viewer}:${list.dataset.listState}`;
+  const savePosition = () => {
+    if (clearingPosition) return;
+    try { sessionStorage.setItem(key, String(window.scrollY)); } catch { /* Storage is optional. */ }
+  };
+  const restorePosition = () => {
+    const navigation = performance.getEntriesByType('navigation')[0];
+    if (navigation?.type !== 'back_forward' && new URLSearchParams(location.search).get('restore') !== '1') return;
+    try {
+      const stored = sessionStorage.getItem(key);
+      const offset = Number(stored);
+      if (stored !== null && Number.isFinite(offset) && offset >= 0) {
+        requestAnimationFrame(() => window.scrollTo(0, offset));
+      }
+    } catch { /* The browser still provides ordinary navigation. */ }
+  };
+  window.addEventListener('pagehide', savePosition);
+  window.addEventListener('pageshow', restorePosition);
+}
+document.querySelectorAll('[data-clear-ui]').forEach((form) => {
+  form.addEventListener('submit', () => {
+    clearingPosition = true;
+    try {
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith(`student-position:${viewer}:`)) sessionStorage.removeItem(key);
+      }
+    } catch { /* No personal content is kept here. */ }
+  });
+});
