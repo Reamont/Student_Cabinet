@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Удалить задачу{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'tasks' %}#deadline-{{ task.pk }}">← Учебные задачи</a>
+<div class="page-heading"><div><h1>Удалить задачу?</h1><p>Это действие нельзя отменить.</p></div></div>
+<section class="card task-form-card"><h2>{{ task.title }}</h2><p class="card-caption section-spaced">{{ task.discipline.name }} · {{ task.due|date:'d.m.Y, H:i' }} по Москве</p>
+{% if planned_windows %}<p class="form-error">Задача также будет убрана из выбранных окон «Плана Б» ({{ planned_windows }}). Сами окна останутся свободными.</p>{% endif %}
+<form method="post" class="form-actions" data-submit-state>{% csrf_token %}<a class="button button-outline" href="{% url 'tasks' %}#deadline-{{ task.pk }}">Оставить задачу</a><button class="button button-primary" type="submit" data-pending-text="Удаляем…">Удалить задачу</button></form></section>
+{% endblock %}

@@ -2,12 +2,13 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .experience import VIEW_CHOICES
+from .task_forms import TaskForm
 from .models import Deadline, LearningResult, ViewPreference
 from .views import student_required
 
@@ -58,3 +59,53 @@ def more(request):
 @require_GET
 def about(request):
     return render(request, 'portal/about.html', {'nav_section': 'more'})
+
+
+@student_required
+@require_http_methods(['GET', 'POST'])
+def task_new(request):
+    form = TaskForm(request.POST if request.method == 'POST' else None, user=request.user)
+    if request.method == 'POST' and form.is_valid():
+        with transaction.atomic():
+            get_user_model().objects.select_for_update().get(pk=request.user.pk)
+            task = form.save(commit=False)
+            task.user = request.user
+            task.save()
+        messages.success(request, f'Задача «{task.title}» добавлена в твой учебный план.')
+        return redirect(reverse('tasks') + f'#deadline-{task.pk}')
+    return render(request, 'portal/task_form.html', {'nav_section': 'study', 'form': form},
+                  status=422 if request.method == 'POST' else 200)
+
+
+@student_required
+@require_http_methods(['GET', 'POST'])
+def task_edit(request, pk):
+    with transaction.atomic():
+        if request.method == 'POST':
+            get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        task = get_object_or_404(Deadline, pk=pk, user=request.user)
+        form = TaskForm(request.POST if request.method == 'POST' else None,
+                        instance=task, user=request.user)
+        if request.method == 'POST' and form.is_valid():
+            form.save()
+            messages.success(request, f'Изменения задачи «{task.title}» сохранены.')
+            return redirect(reverse('tasks') + f'#deadline-{task.pk}')
+    return render(request, 'portal/task_form.html', {'nav_section': 'study', 'form': form, 'task': task},
+                  status=422 if request.method == 'POST' else 200)
+
+
+@student_required
+@require_http_methods(['GET', 'POST'])
+def task_delete(request, pk):
+    with transaction.atomic():
+        if request.method == 'POST':
+            get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        task = get_object_or_404(Deadline, pk=pk, user=request.user)
+        if request.method == 'POST':
+            title = task.title
+            task.delete()
+            messages.success(request, f'Задача «{title}» удалена.')
+            return redirect('tasks')
+        planned_windows = task.studyblock_set.count()
+    return render(request, 'portal/task_delete.html', {'nav_section': 'study', 'task': task,
+                  'planned_windows': planned_windows})
