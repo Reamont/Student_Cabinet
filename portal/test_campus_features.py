@@ -12,9 +12,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .campus_forms import IdeaForm
-from .learning import free_windows
 from .models import (Deadline, Discipline, Group, Idea, IdeaHistory, IdeaSupport,
-                     LearningResult, Lesson, Notification, Profile, StudyBlock)
+                     LearningResult, Lesson, Notification, Profile)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver'], TIME_ZONE='Europe/Moscow',
@@ -64,10 +63,6 @@ class CampusFeatureTests(TestCase):
         self.addCleanup(clock.stop)
         self.client.force_login(self.a)
 
-    def choose(self, **overrides):
-        payload = {'start': '09:00', 'end': '10:30', 'deadline': self.task.pk}
-        payload.update(overrides)
-        return self.client.post(reverse('plan_pick', args=[self.cancelled.pk]), payload)
 
     def idea_payload(self, **overrides):
         payload = {'title': 'Удобный формат консультаций',
@@ -102,85 +97,12 @@ class CampusFeatureTests(TestCase):
         self.assertEqual(r.context['month'], date(2026, 11, 1))
         self.assertEqual(r.context['selected_kind'], '')
 
-    def test_plan_b_suggests_only_own_unfinished_tasks(self):
-        r = self.client.get(reverse('plan_b'), {'date': self.day.isoformat(), 'user_id': self.b.pk})
-        self.assertContains(r, '90 мин свободно')
-        self.assertContains(r, self.task.title)
-        self.assertNotContains(r, self.task_b.title)
-        self.assertNotContains(r, self.done_task.title)
-        self.assertEqual(len(r.context['windows']), 1)
-        self.assertTrue(r.context['windows'][0]['future'])
 
-    def test_windows_subtract_real_lessons_and_deduplicate_cancellations(self):
-        Lesson.objects.create(group=self.ga, discipline=self.da, date=self.day,
-            start=time(9, 30), end=time(10), room='А-2', teacher='Демо')
-        Lesson.objects.create(group=self.ga, discipline=self.da, date=self.day,
-            start=time(9), end=time(10, 30), room='А-3', teacher='Демо', cancelled=True)
-        windows = free_windows(self.a.profile, self.day)
-        self.assertEqual([(w['start'], w['end']) for w in windows],
-                         [(time(9), time(9, 30)), (time(10), time(10, 30))])
 
-    def test_empty_and_past_cancellation_do_not_invent_available_time(self):
-        r = self.client.get(reverse('plan_b'), {'date': '2026-11-10'})
-        self.assertContains(r, 'Свободных окон после отмен нет')
-        with patch('django.utils.timezone.now', return_value=timezone.make_aware(datetime(2026, 11, 12, 8))):
-            self.client.force_login(self.a)
-            r = self.client.get(reverse('plan_b'), {'date': self.day.isoformat()})
-            self.assertContains(r, 'Окно уже началось или прошло')
-            self.assertNotContains(r, 'Добавить в личный план')
-            self.assertEqual(self.choose().status_code, 422)
-        self.assertFalse(StudyBlock.objects.exists())
 
-    def test_plan_choice_persists_is_idempotent_and_appears_on_map(self):
-        self.assertEqual(self.choose(user_id=self.b.pk).status_code, 302)
-        self.assertEqual(self.choose().status_code, 302)
-        block = StudyBlock.objects.get()
-        self.assertEqual(block.user_id, self.a.pk)
-        self.assertEqual(block.deadline_id, self.task.pk)
-        self.client.logout()
-        self.client.force_login(self.a)
-        r = self.client.get(reverse('plan_b'), {'date': self.day.isoformat()})
-        self.assertContains(r, 'Твой выбор: ' + self.task.title)
-        self.assertEqual(r.context['windows'][0]['form'].initial['deadline'], self.task.pk)
-        r = self.client.get(reverse('semester'), {'month': '2026-11', 'kind': 'plan'})
-        self.assertContains(r, self.task.title)
-        self.assertContains(r, 'Выбрано в «Плане Б»')
-        with patch('django.utils.timezone.now', return_value=timezone.make_aware(datetime(2026, 11, 11, 8))):
-            self.client.force_login(self.a)
-            r = self.client.get(reverse('dashboard'))
-            self.assertContains(r, 'Ты выбрал эту задачу в «Плане Б»')
 
-    def test_foreign_completed_or_forged_task_and_window_are_rejected(self):
-        for payload in [{'deadline': self.task_b.pk}, {'deadline': self.done_task.pk},
-                        {'start': '08:00'}, {'end': '12:00'}, {'start': 'bad'}]:
-            with self.subTest(payload=payload):
-                self.assertEqual(self.choose(**payload).status_code, 422)
-        self.assertEqual(self.client.post(reverse('plan_pick', args=[self.lesson_b.pk]),
-            {'deadline': self.task.pk, 'start': '09:00', 'end': '10:30'}).status_code, 404)
-        self.cancelled.cancelled = False
-        self.cancelled.save()
-        self.assertEqual(self.choose().status_code, 422)
-        self.assertFalse(StudyBlock.objects.exists())
 
-    def test_new_busy_lesson_invalidates_stored_block_without_losing_task(self):
-        self.choose()
-        block = StudyBlock.objects.get()
-        Lesson.objects.create(group=self.ga, discipline=self.da, date=self.day,
-            start=time(9), end=time(10, 30), room='А-2', teacher='Демо')
-        r = self.client.get(reverse('plan_b'), {'date': self.day.isoformat()})
-        self.assertContains(r, 'План нужно проверить')
-        r = self.client.get(reverse('semester'), {'month': '2026-11', 'kind': 'plan'})
-        self.assertNotContains(r, 'Выбрано в «Плане Б»')
-        self.assertEqual(self.client.get(reverse('plan_remove', args=[block.pk])).status_code, 405)
-        self.assertEqual(self.client.post(reverse('plan_remove', args=[block.pk])).status_code, 302)
-        self.assertFalse(StudyBlock.objects.exists())
-        self.assertTrue(Deadline.objects.filter(pk=self.task.pk, done=False).exists())
 
-    def test_foreign_block_is_hidden_and_cannot_be_removed(self):
-        block = StudyBlock.objects.create(user=self.b, lesson=self.lesson_b, deadline=self.task_b,
-                                         date=self.day, start=time(9), end=time(10, 30))
-        self.assertEqual(self.client.post(reverse('plan_remove', args=[block.pk])).status_code, 404)
-        self.assertNotContains(self.client.get(reverse('semester'), {'month': '2026-11'}), self.task_b.title)
 
     def test_student_can_publish_with_explicit_consent_and_no_status_injection(self):
         data = self.idea_payload(author=self.b.pk, user_id=self.b.pk, status='done', response='Поддельный ответ')
@@ -281,15 +203,13 @@ class CampusFeatureTests(TestCase):
 
     def test_all_new_pages_require_login_and_mutations_require_csrf(self):
         anonymous = Client()
-        for name, args in [('semester', []), ('plan_b', []), ('ideas', []),
+        for name, args in [('semester', []), ('ideas', []),
                            ('idea_new', []), ('idea_detail', [self.idea.pk])]:
             self.assertEqual(anonymous.get(reverse(name, args=args)).status_code, 302)
         csrf_client = Client(enforce_csrf_checks=True)
         csrf_client.force_login(self.a)
         for name, args, payload in [('idea_new', [], self.idea_payload()),
-                                   ('idea_support', [self.other_idea.pk], {'support': '1'}),
-                                   ('plan_pick', [self.cancelled.pk], {'deadline': self.task.pk}),
-                                   ('plan_remove', [99999], {})]:
+                                   ('idea_support', [self.other_idea.pk], {'support': '1'})]:
             self.assertEqual(csrf_client.post(reverse(name, args=args), payload).status_code, 403)
 
     def test_user_text_and_public_staff_response_are_escaped(self):
@@ -320,12 +240,3 @@ class CampusFeatureTests(TestCase):
         self.assertTrue(curator.has_perm('portal.view_idea'))
         self.assertEqual((Idea.objects.count(), IdeaHistory.objects.count()), before)
 
-    def test_plan_b_defaults_to_next_known_cancellation_without_inventing_a_date(self):
-        response = self.client.get(reverse('plan_b'))
-        self.assertEqual(response.context['day'], self.day)
-        response = self.client.get(reverse('plan_b'), {'date': '2026-11-10'})
-        self.assertEqual(response.context['day'], date(2026, 11, 10))
-        self.cancelled.cancelled = False
-        self.cancelled.save()
-        response = self.client.get(reverse('plan_b'))
-        self.assertEqual(response.context['day'], date(2026, 11, 8))

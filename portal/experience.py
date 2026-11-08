@@ -8,7 +8,7 @@ VIEW_CHOICES = {
     'notifications_unread': ('0', '1'),
     'ideas_status': ('', *dict(Idea.Status.choices)),
     'ideas_sort': ('new', 'popular'),
-    'semester_kind': ('', 'lessons', 'tasks', 'exams', 'plan'),
+    'semester_kind': ('', 'lessons', 'tasks', 'exams'),
 }
 
 

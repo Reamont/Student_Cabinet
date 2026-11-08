@@ -14,8 +14,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import ClarificationForm, RequestDraftForm, RequestForm
 from .models import Deadline, LearningResult, Lesson, Notification, Profile, RequestDraft, StudentRequest
-from .services import lock_request_owner, record_status, save_request_draft
-from .learning import study_blocks
+from .services import sync_task_notification, lock_request_owner, record_status, save_request_draft
 from .experience import view_option
 
 
@@ -84,11 +83,6 @@ def dashboard(request):
     for item in StudentRequest.objects.filter(user=request.user, status='clarify'):
         plan.append({'title': f'{item.number} · Ответьте на уточнение', 'reason': 'Деканату нужны дополнительные сведения',
                      'url': reverse('request_detail', args=[item.pk]), 'kind': 'Заявка'})
-    for block in study_blocks(request.student, today, today):
-        if block.is_valid and not block.deadline.done and block.end > now.time():
-            plan.append({'title': f'{block.start:%H:%M} · {block.deadline.title}',
-                         'reason': 'Ты выбрал эту задачу в «Плане Б»',
-                         'url': reverse('plan_b') + '?date=' + today.isoformat(), 'kind': 'Личный план'})
     clarification = StudentRequest.objects.filter(user=request.user, status='clarify').first()
     overdue = Deadline.objects.filter(user=request.user, done=False, due__lt=now).order_by('due').first()
     debts = LearningResult.objects.filter(user=request.user, state='debt').select_related('discipline')
@@ -155,6 +149,7 @@ def deadline_toggle(request, pk):
         deadline = get_object_or_404(Deadline.objects.select_for_update(), pk=pk, user=request.user)
         deadline.done = request.POST.get('done') == '1'
         deadline.save(update_fields=['done'])
+        sync_task_notification(deadline)
     messages.success(request, 'Отметка об учебной задаче сохранена.')
     if request.POST.get('return_to') == 'tasks':
         return redirect(reverse('tasks') + f'#deadline-{pk}')

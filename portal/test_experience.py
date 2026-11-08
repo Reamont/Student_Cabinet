@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import (Deadline, Discipline, Group, Lesson, Profile, RequestDraft,
-                     StudentRequest, StudyBlock, ViewPreference, RequestHistory)
+                     StudentRequest, ViewPreference, RequestHistory)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver'], TIME_ZONE='Europe/Moscow',
@@ -47,11 +47,6 @@ class ExperienceTests(TestCase):
     def save_view(self, **data):
         return self.client.post(reverse('preference_save'), data, HTTP_ACCEPT='application/json')
 
-    def remove_block(self):
-        block = StudyBlock.objects.create(user=self.a, lesson=self.cancelled, deadline=self.task,
-            date=self.day, start=time(9), end=time(10, 30))
-        self.client.post(reverse('plan_remove', args=[block.pk]))
-        return block
 
     def test_new_destinations_require_login_and_tasks_are_private(self):
         guest = Client()
@@ -164,63 +159,10 @@ class ExperienceTests(TestCase):
                              reverse('tasks') + f'#deadline-{self.task.pk}')
         self.assertEqual(self.client.post(reverse('deadline_toggle', args=[self.foreign_task.pk]), {'done': '1'}).status_code, 404)
 
-    def test_undo_restores_removed_block_once_without_completing_task(self):
-        self.remove_block()
-        self.assertFalse(StudyBlock.objects.exists())
-        response = self.client.get(reverse('plan_b'), {'date': self.day.isoformat()})
-        self.assertContains(response, 'Вернуть задачу')
-        for _ in range(2):
-            self.assertEqual(self.client.post(reverse('plan_restore')).status_code, 302)
-        self.assertEqual(StudyBlock.objects.filter(user=self.a, deadline=self.task).count(), 1)
-        self.task.refresh_from_db()
-        self.assertFalse(self.task.done)
-        self.assertNotIn('study_undo', self.client.session)
 
-    def test_undo_expires_and_cannot_be_forged_by_post(self):
-        self.remove_block()
-        session = self.client.session
-        session['study_undo'] = {**session['study_undo'], 'expires': timezone.now().timestamp() - 1}
-        session.save()
-        self.client.post(reverse('plan_restore'), {'deadline': self.task.pk, 'expires': 9999999999})
-        self.assertFalse(StudyBlock.objects.exists())
 
-    def test_undo_rejects_foreign_session_owner_and_task(self):
-        self.remove_block()
-        snapshot = self.client.session['study_undo']
-        self.client.force_login(self.b)
-        self.client.post(reverse('plan_restore'))
-        self.assertFalse(StudyBlock.objects.exists())
-        self.client.force_login(self.a)
-        session = self.client.session
-        session['study_undo'] = {**snapshot, 'deadline': self.foreign_task.pk}
-        session.save()
-        self.client.post(reverse('plan_restore'))
-        self.assertFalse(StudyBlock.objects.exists())
 
-    def test_undo_revalidates_changed_schedule_done_task_and_conflict(self):
-        self.remove_block()
-        self.cancelled.cancelled = False
-        self.cancelled.save()
-        self.assertEqual(self.client.post(reverse('plan_restore')).status_code, 422)
-        self.assertFalse(StudyBlock.objects.exists())
-        self.cancelled.cancelled = True
-        self.cancelled.save()
-        self.task.done = True
-        self.task.save()
-        self.assertEqual(self.client.post(reverse('plan_restore')).status_code, 422)
-        self.task.done = False
-        self.task.save()
-        other = Deadline.objects.create(user=self.a, discipline=self.discipline, title='Другая задача', due=self.task.due)
-        StudyBlock.objects.create(user=self.a, lesson=self.cancelled, deadline=other,
-            date=self.day, start=time(9), end=time(10, 30))
-        self.assertEqual(self.client.post(reverse('plan_restore')).status_code, 422)
-        self.assertEqual(StudyBlock.objects.get().deadline_id, other.pk)
 
-    def test_undo_requires_csrf_and_post(self):
-        self.assertEqual(self.client.get(reverse('plan_restore')).status_code, 405)
-        csrf_client = Client(enforce_csrf_checks=True)
-        csrf_client.force_login(self.a)
-        self.assertEqual(csrf_client.post(reverse('plan_restore')).status_code, 403)
 
     def test_invalid_clarification_retains_latest_employee_question(self):
         self.active.status = 'clarify'

@@ -6,8 +6,9 @@ from django.urls import reverse
 
 from .forms import RequestDraftForm, RequestForm
 from .guidance import student_guides
-from .models import RequestDraft, StudentRequest
-from .services import save_request_draft
+from django.db import transaction
+from .models import DeletedDraft, RequestDraft, StudentRequest
+from .services import lock_request_owner, save_request_draft
 from .views import student_required
 
 
@@ -25,8 +26,8 @@ def draft_save(request):
     draft = save_request_draft(request.user, form)
     if draft is None:
         if wants_json:
-            return JsonResponse({'error': 'Эта форма уже отправлена. Открой новую заявку.'}, status=409)
-        messages.info(request, 'Эта форма уже отправлена. Черновик не создан.')
+            return JsonResponse({'error': 'Эта форма уже отправлена или черновик удалён. Открой новую заявку.'}, status=409)
+        messages.info(request, 'Эта форма уже отправлена или черновик удалён. Черновик не создан.')
         return redirect('requests')
     if wants_json:
         return JsonResponse({'saved': True, 'updated_at': draft.updated_at.isoformat()})
@@ -47,8 +48,11 @@ def draft_edit(request, key):
 @student_required
 @require_POST
 def draft_delete(request, key):
-    draft = get_object_or_404(RequestDraft, idempotency_key=key, user=request.user)
-    draft.delete()
+    with transaction.atomic():
+        lock_request_owner(request.user)
+        draft = get_object_or_404(RequestDraft, idempotency_key=key, user=request.user)
+        DeletedDraft.objects.get_or_create(user=request.user, key=draft.idempotency_key)
+        draft.delete()
     messages.success(request, 'Черновик удалён.')
     return redirect(reverse('requests') + '?tab=drafts')
 

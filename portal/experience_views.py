@@ -9,7 +9,8 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 
 from .experience import VIEW_CHOICES
 from .task_forms import TaskForm
-from .models import Deadline, LearningResult, ViewPreference
+from .services import sync_task_notification
+from .models import TaskSubmission, Deadline, LearningResult, ViewPreference
 from .views import student_required
 
 
@@ -68,9 +69,21 @@ def task_new(request):
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():
             get_user_model().objects.select_for_update().get(pk=request.user.pk)
+            receipt, created = TaskSubmission.objects.get_or_create(key=form.key, defaults={'user': request.user})
+            if receipt.user_id != request.user.pk:
+                from django.http import Http404
+                raise Http404
+            if not created:
+                if receipt.task_id:
+                    return redirect(reverse('tasks') + f'#deadline-{receipt.task_id}')
+                messages.info(request, 'Эта задача уже удалена. Для новой задачи открой новую форму.')
+                return redirect('tasks')
             task = form.save(commit=False)
             task.user = request.user
             task.save()
+            receipt.task = task
+            receipt.save(update_fields=['task'])
+            sync_task_notification(task)
         messages.success(request, f'Задача «{task.title}» добавлена в твой учебный план.')
         return redirect(reverse('tasks') + f'#deadline-{task.pk}')
     return render(request, 'portal/task_form.html', {'nav_section': 'study', 'form': form},
@@ -88,6 +101,7 @@ def task_edit(request, pk):
                         instance=task, user=request.user)
         if request.method == 'POST' and form.is_valid():
             form.save()
+            sync_task_notification(task)
             messages.success(request, f'Изменения задачи «{task.title}» сохранены.')
             return redirect(reverse('tasks') + f'#deadline-{task.pk}')
     return render(request, 'portal/task_form.html', {'nav_section': 'study', 'form': form, 'task': task},
@@ -106,6 +120,4 @@ def task_delete(request, pk):
             task.delete()
             messages.success(request, f'Задача «{title}» удалена.')
             return redirect('tasks')
-        planned_windows = task.studyblock_set.count()
-    return render(request, 'portal/task_delete.html', {'nav_section': 'study', 'task': task,
-                  'planned_windows': planned_windows})
+    return render(request, 'portal/task_delete.html', {'nav_section': 'study', 'task': task})

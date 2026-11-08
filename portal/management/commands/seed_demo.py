@@ -11,19 +11,20 @@ from django.db import transaction
 from django.utils import timezone
 
 from portal.models import (Announcement, Deadline, Discipline, Group, LearningResult,
-                           Lesson, Notification, Profile, RequestHistory, StudentRequest, Idea, IdeaHistory)
+                           Lesson, Notification, Profile, RequestHistory, StudentRequest, Idea, IdeaHistory, DemoTaskSeed)
+from portal.services import sync_task_notification
 
 
 SEMESTER_END = date(2026, 12, 31)
 CANCELLED_DEMO_DAY = date(2026, 11, 4)
-PLAN_B_DEMO_DAY = date(2026, 11, 11)
+
 WEEKDAY_SLOTS = (3, 3, 5, 2, 2, 0, 0)
 
 
 def lesson_values(day, slot, *, legacy=False):
     moved = slot == 1 and day.weekday() in (1, 3)
     cancelled = (slot == 2 and day.weekday() == 4) if legacy else (
-        day in (CANCELLED_DEMO_DAY, PLAN_B_DEMO_DAY) and slot == 4)
+        day == CANCELLED_DEMO_DAY and slot == 4)
     starts = (time(9), time(11, 45) if moved else time(10, 40), time(14), time(15, 50), time(17, 30))
     ends = (time(10, 30), time(13, 15) if moved else time(12, 10), time(15, 30), time(17, 20), time(19))
     return {
@@ -59,13 +60,7 @@ def seed_schedule(group, disciplines, index, monday, today):
             discipline = disciplines[(day.weekday() + slot + index * 3) % len(disciplines)]
             lesson, created = Lesson.objects.get_or_create(
                 group=group, date=day, start=values.pop('start'), discipline=discipline, defaults=values)
-            if not created and day == PLAN_B_DEMO_DAY and slot == 4:
-                # Upgrade only an untouched row from the previous demo timetable.
-                previous = {**values, 'cancelled': False, 'change_note': ''}
-                if all(getattr(lesson, field) == value for field, value in previous.items()):
-                    lesson.cancelled = True
-                    lesson.change_note = values['change_note']
-                    lesson.save(update_fields=['cancelled', 'change_note'])
+
 
 
 class Command(BaseCommand):
@@ -124,10 +119,12 @@ class Command(BaseCommand):
                 })
             for i, title in enumerate(['Отправить проектную работу', 'Подготовить лабораторную № 3', 'Повторить темы к экзамену']):
                 due = timezone.make_aware(datetime.combine(today+timedelta(days=[0,2,7][i]), time(18,0)))
-                deadline, _ = Deadline.objects.get_or_create(user=user, title=title, defaults={
-                    'discipline': disciplines[(i+index)%len(disciplines)], 'due': due})
-                Notification.objects.get_or_create(user=user, kind='deadline', title=f'Учебная задача: {title}', defaults={
-                    'body': f'Срок: {timezone.localtime(deadline.due):%d.%m.%Y %H:%M}. Подробности в успеваемости.'})
+                marker, created = DemoTaskSeed.objects.get_or_create(user=user, key=f'demo-task-{i}')
+                if created:
+                    marker.task = Deadline.objects.create(user=user, title=title,
+                        discipline=disciplines[(i+index)%len(disciplines)], due=due)
+                    marker.save(update_fields=['task'])
+                    sync_task_notification(marker.task)
             samples = [('clarify','destination','Уточните полное название организации — места требования.'),
                        ('work','study','Обращение зарегистрировано и передано специалисту.'),
                        ('ready','study','Демонстрационная справка готова. В прототипе выдача файлов не предусмотрена.')] if index == 0 else [

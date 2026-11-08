@@ -3,19 +3,8 @@ import uuid
 from django import forms
 from django.core import signing
 
-from .models import Deadline
 
 
-class StudyBlockForm(forms.Form):
-    start = forms.TimeField(input_formats=['%H:%M'], widget=forms.HiddenInput)
-    end = forms.TimeField(input_formats=['%H:%M'], widget=forms.HiddenInput)
-    deadline = forms.ModelChoiceField(label='Какой задаче уделить время?', queryset=Deadline.objects.none())
-
-    def __init__(self, *args, user, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['deadline'].empty_label = 'Выбери задачу'
-        self.fields['deadline'].queryset = Deadline.objects.filter(user=user, done=False).select_related('discipline')
-        self.fields['deadline'].label_from_instance = lambda item: f'{item.title} · {item.discipline.name}'
 
 
 class IdeaForm(forms.Form):

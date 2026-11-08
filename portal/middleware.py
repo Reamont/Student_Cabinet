@@ -25,11 +25,52 @@ class PrivateResponseMiddleware:
         return response
 
 
-class LoginRateLimitMiddleware:
-    """Shared DB-backed window for student and built-in employee login.
 
-    Count all POST attempts, including successful ones. Never trust X-Forwarded-For.
-    When configured, nginx enforces the address limit; the account limit stays here.
+def login_keys(request, username):
+    identifiers = [('account:' + username.strip().casefold(), 10)]
+    if not settings.LOGIN_RATE_LIMIT_AT_PROXY:
+        identifiers.append(('address:' + request.META.get('REMOTE_ADDR', ''), 40))
+    return [(hmac.new(settings.SECRET_KEY.encode(), value.encode(), hashlib.sha256).hexdigest(), limit)
+            for value, limit in identifiers]
+
+
+def is_login_request(request):
+    return request is not None and request.method == 'POST' and request.path in ('/login/', '/admin/login/')
+
+
+from django.contrib.auth.signals import user_login_failed, user_logged_in
+from django.dispatch import receiver
+
+
+@receiver(user_login_failed, dispatch_uid='campus_failed_login')
+def failed_login(sender, credentials, request=None, **kwargs):
+    if not is_login_request(request):
+        return
+    now = timezone.now()
+    with transaction.atomic():
+        for key, limit in login_keys(request, credentials.get('username', '')):
+            LoginThrottle.objects.get_or_create(key=key)
+            row = LoginThrottle.objects.select_for_update().get(key=key)
+            if now - row.started_at >= timedelta(minutes=15):
+                row.failures = 0
+                row.started_at = now
+            row.failures += 1
+            row.save(update_fields=['failures', 'started_at'])
+
+
+@receiver(user_logged_in, dispatch_uid='campus_successful_login')
+def successful_login(sender, request, user, **kwargs):
+    if is_login_request(request):
+        # Clear this account only; failed attempts from the address remain limited.
+        key, _ = login_keys(request, request.POST.get('username', user.username))[0]
+        LoginThrottle.objects.filter(key=key).delete()
+
+
+class LoginRateLimitMiddleware:
+    """Check failed logins; never trust client-supplied forwarded addresses.
+
+    The bundled nginx handles per-connection traffic limits when configured;
+    account failures are always tracked in the shared database.
     """
     def __init__(self, get_response):
         self.get_response = get_response
@@ -38,32 +79,19 @@ class LoginRateLimitMiddleware:
         return self.get_response(request)
 
     def process_view(self, request, view_func, view_args, view_kwargs):
-        if request.method != 'POST' or request.path not in ('/login/', '/admin/login/'):
+        if not is_login_request(request):
             return None
-        identifiers = [('account:' + request.POST.get('username', '').strip().casefold(), 10)]
-        if not settings.LOGIN_RATE_LIMIT_AT_PROXY:
-            identifiers.append(('address:' + request.META.get('REMOTE_ADDR', ''), 40))
-        blocked = False
         now = timezone.now()
-        with transaction.atomic():
-            for identifier, limit in identifiers:
-                key = hmac.new(settings.SECRET_KEY.encode(), identifier.encode(), hashlib.sha256).hexdigest()
-                row, _ = LoginThrottle.objects.get_or_create(key=key)
-                row = LoginThrottle.objects.select_for_update().get(pk=row.pk)
-                if now - row.started_at >= timedelta(minutes=15):
-                    row.failures = 0
-                    row.started_at = now
-                if row.failures >= limit:
-                    blocked = True
-                else:
-                    row.failures += 1
-                row.save(update_fields=['failures', 'started_at'])
-        if blocked:
+        wait = 0
+        for key, limit in login_keys(request, request.POST.get('username', '')):
+            row = LoginThrottle.objects.filter(key=key).first()
+            if row and row.failures >= limit:
+                remaining = 900 - (now - row.started_at).total_seconds()
+                wait = max(wait, int(remaining) + 1 if remaining > 0 else 0)
+        if wait:
             response = HttpResponse(
                 '<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width, initial-scale=1">'
-                '<title>Попробуйте позже</title><h1>Слишком много попыток входа</h1>'
-                '<p>Подождите 15 минут. Это временная защита аккаунта.</p><a href="/login/">Вернуться ко входу</a></html>',
-                status=429,
-            )
-            response['Retry-After'] = '900'
+                '<title>Попробуйте позже</title><h1>Слишком много неудачных попыток входа</h1>'
+                '<p>Подождите до 15 минут и повторите вход.</p><a href="/login/">Вернуться ко входу</a></html>', status=429)
+            response['Retry-After'] = str(wait)
             return response

@@ -11,7 +11,7 @@ from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE = os.environ.get('SMOKE_BASE_URL', 'http://127.0.0.1:8000').rstrip('/')
-DAY = os.environ.get('SMOKE_PLAN_DATE', '2026-11-11')
+DAY = os.environ.get('SMOKE_SEMESTER_DATE', '2026-11-11')
 credentials = {}
 for line in (ROOT / 'var/dev.env').read_text().splitlines():
     key, value = line.split('=', 1)
@@ -84,21 +84,6 @@ with sync_playwright() as p:
         expect(details).not_to_have_attribute('open', '')
         details.locator('summary').click()
         expect(details.locator('p').first).to_be_visible()
-        page.get_by_role('link', name='Открыть План Б', exact=False).first.click()
-        fits(page)
-        window = page.locator('.plan-window').first
-        if not window.locator('.selected-study').count():
-            window.locator('select').select_option(index=1)
-            window.get_by_role('button', name='Добавить в личный план').click()
-        selected = page.locator('.selected-study h3').inner_text()
-        page.locator('.selected-study').get_by_role('button', name='Убрать из плана').click()
-        expect(page.locator('.selected-study')).to_have_count(0)
-        page.get_by_role('button', name='Вернуть задачу', exact=True).click()
-        expect(page.locator('.selected-study h3')).to_have_text(selected)
-        expect(page.locator('.undo-note')).to_have_count(0)
-        fits(page)
-        print(f'PASS {width}x{height}: remembered schedule, lesson disclosures, contextual Plan B, remove/undo')
-
         # Failed preference write keeps the chosen view and offers a working retry.
         def fail_save(route):
             route.fulfill(status=503, content_type='application/json', body='{}')
@@ -128,8 +113,9 @@ with sync_playwright() as p:
             page.wait_for_url(re.compile(r'/requests/\d+/$'))
         page.goto(BASE + '/requests/?tab=active')
         remembered(page)
-        page.evaluate('window.scrollTo(0, 650)')
-        page.wait_for_function('window.scrollY >= 600')
+        target = page.evaluate('Math.min(650, document.documentElement.scrollHeight - innerHeight)')
+        page.evaluate('(target) => window.scrollTo(0, target)', target)
+        page.wait_for_function('(target) => Math.abs(window.scrollY - target) < 8', arg=target)
         offset = page.evaluate('window.scrollY')
         # Navigate without scrolling the row into view so the snapshot is deterministic.
         page.goto(BASE + rows.first.locator('a.request-row').get_attribute('href'))

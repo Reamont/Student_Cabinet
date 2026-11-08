@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.contrib.auth import get_user_model
-from .models import IdeaHistory, Notification, RequestDraft, RequestHistory, StudentRequest
+from .models import DeletedDraft, IdeaHistory, Notification, RequestDraft, RequestHistory, StudentRequest
 
 
 def lock_request_owner(user):
@@ -12,7 +12,8 @@ def lock_request_owner(user):
 @transaction.atomic
 def save_request_draft(user, form):
     lock_request_owner(user)
-    if StudentRequest.objects.filter(idempotency_key=form.idempotency_key).exists():
+    if (StudentRequest.objects.filter(idempotency_key=form.idempotency_key).exists() or
+            DeletedDraft.objects.filter(user=user, key=form.idempotency_key).exists()):
         return None
     draft, _ = RequestDraft.objects.update_or_create(
         user=user, idempotency_key=form.idempotency_key,
@@ -38,3 +39,14 @@ def record_idea_update(item, actor):
                      body=item.response, related_idea=item)
         for user_id in recipients
     ])
+
+
+@transaction.atomic
+def sync_task_notification(task):
+    title = f'Учебная задача: {task.title}'[:240]
+    from django.utils import timezone
+    Notification.objects.update_or_create(related_deadline=task, defaults={
+        'user': task.user, 'kind': 'deadline', 'title': title,
+        'body': f'Срок: {timezone.localtime(task.due):%d.%m.%Y %H:%M}. ' +
+                ('Задача выполнена.' if task.done else 'Открой учебную задачу.'),
+        'read_at': None, 'created_at': timezone.now()})

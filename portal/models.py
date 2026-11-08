@@ -160,6 +160,7 @@ class Notification(models.Model):
     title = models.CharField(max_length=240)
     body = models.TextField()
     announcement = models.ForeignKey(Announcement, null=True, blank=True, on_delete=models.CASCADE)
+    related_deadline = models.OneToOneField(Deadline, null=True, blank=True, on_delete=models.CASCADE)
     related_request = models.ForeignKey(StudentRequest, null=True, blank=True, on_delete=models.CASCADE)
     related_idea = models.ForeignKey('Idea', null=True, blank=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(default=timezone.now)
@@ -180,21 +181,6 @@ class ViewPreference(models.Model):
     values = models.JSONField(default=dict)
 
 
-class StudyBlock(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)
-    deadline = models.ForeignKey(Deadline, on_delete=models.CASCADE)
-    date = models.DateField()
-    start = models.TimeField()
-    end = models.TimeField()
-    created_at = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        ordering = ['date', 'start', 'pk']
-        constraints = [
-            models.UniqueConstraint(fields=['user', 'lesson', 'date', 'start', 'end'], name='one_task_per_study_window'),
-            models.CheckConstraint(condition=Q(end__gt=models.F('start')), name='study_block_positive_duration'),
-        ]
 
 
 class Idea(models.Model):
@@ -239,3 +225,23 @@ class IdeaHistory(models.Model):
 
     class Meta:
         ordering = ['created_at', 'pk']
+
+
+class DeletedDraft(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    key = models.UUIDField(unique=True)
+
+
+class TaskSubmission(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    key = models.UUIDField(unique=True)
+    task = models.ForeignKey(Deadline, null=True, on_delete=models.SET_NULL)
+
+
+class DemoTaskSeed(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    key = models.CharField(max_length=60)
+    task = models.ForeignKey(Deadline, null=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'key'], name='one_demo_task_seed')]
