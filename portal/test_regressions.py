@@ -1,3 +1,6 @@
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TransactionTestCase
 import io
 import os
 from pathlib import Path
@@ -140,9 +143,49 @@ class RegressionTests(TestCase):
         self.assertIn('127.0.0.1:8000:8000',compose)
 
 
-from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
-from django.test import TransactionTestCase
+
+
+    def test_changed_task_replay_reports_conflict_and_keeps_input(self):
+        data = self.payload()
+        self.client.post(reverse('task_new'), data)
+        for changes in ({'title': 'Другое название'}, {'due': '2026-12-01T12:00'}):
+            response = self.client.post(reverse('task_new'), {**data, **changes})
+            self.assertEqual(response.status_code, 409)
+            for field, value in changes.items():
+                self.assertEqual(response.context['form'][field].value(), value)
+        self.assertEqual(Deadline.objects.filter(title=data['title']).count(), 1)
+
+    def test_unchanged_task_edit_preserves_read_notification(self):
+        data = self.payload()
+        self.client.post(reverse('task_new'), data)
+        task = Deadline.objects.get(title=data['title'])
+        note = Notification.objects.get(related_deadline=task)
+        note.read_at = timezone.now()
+        note.save()
+        before = (note.read_at, note.created_at)
+        edit = self.client.get(reverse('task_edit', args=[task.pk]))
+        data['token'] = edit.context['form']['token'].value()
+        self.assertEqual(self.client.post(reverse('task_edit', args=[task.pk]), data).status_code, 302)
+        note.refresh_from_db()
+        self.assertEqual((note.read_at, note.created_at), before)
+
+    @override_settings(LOGIN_RATE_LIMIT_AT_PROXY=True)
+    def test_success_between_failure_counter_creation_and_lock(self):
+        from django.test import RequestFactory
+        from .middleware import failed_login, successful_login, login_keys
+        from .models import LoginThrottle
+        request = RequestFactory().post('/login/', {'username': self.a.username})
+        original = LoginThrottle.objects.get_or_create
+
+        def interleave(*args, **kwargs):
+            result = original(*args, **kwargs)
+            successful_login(sender=None, request=request, user=self.a)
+            return result
+
+        with patch.object(LoginThrottle.objects, 'get_or_create', side_effect=interleave):
+            failed_login(sender=None, credentials={'username': self.a.username}, request=request)
+        key, _ = login_keys(request, self.a.username)[0]
+        self.assertEqual(LoginThrottle.objects.get(key=key).failures, 1)
 
 
 class UpgradeRegressionTests(TransactionTestCase):

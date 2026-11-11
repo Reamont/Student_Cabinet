@@ -63,7 +63,7 @@ def successful_login(sender, request, user, **kwargs):
     if is_login_request(request):
         # Clear this account only; failed attempts from the address remain limited.
         key, _ = login_keys(request, request.POST.get('username', user.username))[0]
-        LoginThrottle.objects.filter(key=key).delete()
+        LoginThrottle.objects.filter(key=key).update(failures=0, started_at=timezone.now())
 
 
 class LoginRateLimitMiddleware:
