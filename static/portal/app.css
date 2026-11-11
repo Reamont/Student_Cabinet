@@ -186,3 +186,18 @@ html::-webkit-scrollbar-thumb:hover {
 @media (forced-colors: active) {
   html { scrollbar-color: auto; }
 }
+
+.notification-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+.notification-toolbar .filter-form {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  padding-bottom: 0;
+}
+.notification-toolbar > form { max-width: 100%; }
