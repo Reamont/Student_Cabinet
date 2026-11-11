@@ -10,7 +10,7 @@ from django.http import HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from .forms import ClarificationForm, RequestDraftForm, RequestForm
 from .models import Deadline, LearningResult, Lesson, Notification, Profile, RequestDraft, StudentRequest
@@ -267,8 +267,12 @@ def notifications(request):
 
 
 @student_required
+@require_GET
 def notification_detail(request, pk):
     item = get_object_or_404(Notification, pk=pk, user=request.user)
+    if item.read_at is None:
+        Notification.objects.filter(pk=item.pk, user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+        item.refresh_from_db()
     return render(request, 'portal/notification_detail.html', {'nav_section': 'notifications', 'notification': item})
 
 
@@ -280,6 +284,14 @@ def notification_read(request, pk):
         item.read_at = timezone.now()
         item.save(update_fields=['read_at'])
     messages.success(request, 'Уведомление отмечено прочитанным.')
+    return redirect('notifications')
+
+
+@student_required
+@require_POST
+def notifications_read_all(request):
+    Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+    messages.success(request, 'Все уведомления отмечены прочитанными.')
     return redirect('notifications')
 
 
