@@ -14,6 +14,7 @@ class RequestForm(forms.Form):
                            widget=forms.Textarea(attrs={'rows': 5}),
                            help_text='Для заявления опишите вопрос (не менее 10 символов). Не указывайте реальные персональные данные.')
     token = forms.CharField(widget=forms.HiddenInput)
+    draft_version = forms.CharField(required=False, max_length=64, widget=forms.HiddenInput)
 
     def __init__(self, *args, user, draft_key=None, **kwargs):
         self.user = user

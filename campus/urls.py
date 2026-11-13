@@ -23,6 +23,7 @@ urlpatterns = [
     path('requests/<int:pk>/repeat/', request_features.request_repeat, name='request_repeat'),
     path('requests/<int:pk>/clarify/', views.request_clarify, name='request_clarify'),
     path('notifications/', views.notifications, name='notifications'),
+    path('notifications/read-all/', views.notifications_read_all, name='notifications_read_all'),
     path('notifications/<int:pk>/', views.notification_detail, name='notification_detail'),
     path('notifications/<int:pk>/read/', views.notification_read, name='notification_read'),
     path('profile/', views.profile, name='profile'),

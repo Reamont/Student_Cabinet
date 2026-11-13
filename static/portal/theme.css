@@ -34,6 +34,8 @@
   --focus: #526fbb;
   --shadow-color: #17282d10;
   --shadow: 0 3px 18px #17282d03;
+  --scrollbar-thumb: #17282d;
+  --scrollbar-hover: #2c4643;
 }
 
 :root[data-theme="dark"] {
@@ -69,6 +71,8 @@
   --focus: #a4bfff;
   --shadow-color: #0003;
   --shadow: 0 3px 18px #0002;
+  --scrollbar-thumb: #708574;
+  --scrollbar-hover: #a7bf8c;
 }
 
 .theme-toggle,

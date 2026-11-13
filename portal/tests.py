@@ -207,10 +207,14 @@ class PortalIntegrationTests(TestCase):
         with patch('django.core.signing.time.time', return_value=timezone.now().timestamp() + 7200):
             self.assertEqual(self.client.post(reverse('request_submit'), payload).status_code, 422)
 
-    def test_notification_read_is_per_user_and_get_has_no_side_effect(self):
+    def test_opening_notification_marks_only_own_and_preserves_read_time(self):
         self.assertEqual(self.client.get(reverse('notification_detail', args=[self.notification_a.pk])).status_code, 200)
         self.notification_a.refresh_from_db()
-        self.assertIsNone(self.notification_a.read_at)
+        self.assertIsNotNone(self.notification_a.read_at)
+        first_read = self.notification_a.read_at
+        self.assertEqual(self.client.get(reverse('notification_detail', args=[self.notification_a.pk])).context['unread_count'], 0)
+        self.notification_a.refresh_from_db()
+        self.assertEqual(self.notification_a.read_at, first_read)
         self.assertEqual(self.client.get(reverse('notification_read', args=[self.notification_a.pk])).status_code, 405)
         self.client.post(reverse('notification_read', args=[self.notification_a.pk]))
         self.notification_a.refresh_from_db()
@@ -218,6 +222,37 @@ class PortalIntegrationTests(TestCase):
         self.assertIsNotNone(self.notification_a.read_at)
         self.assertIsNone(self.notification_b.read_at)
         self.assertEqual(self.client.get(reverse('notifications'), {'unread': '1'}).context['notifications'].count(), 0)
+
+    def test_read_all_is_owner_scoped_idempotent_and_keeps_existing_dates(self):
+        read_at = timezone.now() - timedelta(days=1)
+        old = Notification.objects.create(user=self.alisa, kind='schedule', title='Прочитано', body='Текст', read_at=read_at)
+        extra = Notification.objects.create(user=self.alisa, kind='deadline', title='Непрочитано', body='Текст')
+        self.assertContains(self.client.get(reverse('notifications')), 'Отметить все прочитанными')
+        self.assertEqual(self.client.post(reverse('notifications_read_all'), {'user_id': self.boris.pk}).status_code, 302)
+        self.notification_a.refresh_from_db()
+        extra.refresh_from_db()
+        old.refresh_from_db()
+        self.notification_b.refresh_from_db()
+        self.assertIsNotNone(self.notification_a.read_at)
+        self.assertIsNotNone(extra.read_at)
+        self.assertEqual(old.read_at, read_at)
+        self.assertIsNone(self.notification_b.read_at)
+        first_read = extra.read_at
+        self.client.post(reverse('notifications_read_all'))
+        extra.refresh_from_db()
+        self.assertEqual(extra.read_at, first_read)
+        self.assertNotContains(self.client.get(reverse('notifications')), 'Отметить все прочитанными')
+
+    def test_read_all_requires_post_login_and_csrf(self):
+        url = reverse('notifications_read_all')
+        self.assertEqual(self.client.get(url).status_code, 405)
+        browser = Client(enforce_csrf_checks=True)
+        browser.force_login(self.alisa)
+        self.assertEqual(browser.post(url).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.client.post(url).status_code, 302)
+        self.notification_a.refresh_from_db()
+        self.assertIsNone(self.notification_a.read_at)
 
     def test_notification_filters_do_not_expose_other_student(self):
         own = Notification.objects.create(user=self.alisa, kind='schedule', title='Моя перемена', body='Кабинет 202')

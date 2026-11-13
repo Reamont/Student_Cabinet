@@ -108,15 +108,19 @@
 }
 
 .sidebar-scroll {
-  flex:1 1 0;
-  min-height:0;
-  overflow-y:auto;
-  overflow-x:hidden;
-  overscroll-behavior-y:contain;
-  scroll-padding-block:8px;
-  scrollbar-width:thin;
-  margin:8px -6px 0;
-  padding:6px;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 8px;
+  scrollbar-width: none;
+  margin: 8px -6px 0;
+  padding: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar-scroll .university {
@@ -158,3 +162,42 @@
 /* Personal task forms and actions. */
 .task-form-card{max-width:780px}.task-form-card h2{overflow-wrap:anywhere;line-height:1.5}.task-links{display:flex;gap:12px;flex-wrap:wrap}.task-links .text-link{min-height:44px;display:inline-flex;align-items:center}.deadline-row{flex-wrap:wrap}.deadline-row>div:first-child{flex:1;min-width:180px}.task-form-card input[type=datetime-local]{width:100%;min-width:0;max-width:100%}
 @media(max-width:760px){.task-links{width:100%}.task-form-card .form-actions{flex-wrap:wrap}.task-form-card .form-actions>.button{white-space:normal;max-width:100%}.deadline-row>div:first-child{min-width:0;flex-basis:100%}}
+
+/* Match the page scrollbar to the campus palette. */
+html {
+  scrollbar-color: var(--scrollbar-thumb) var(--paper);
+  scrollbar-width: thin;
+}
+html::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html::-webkit-scrollbar-track {
+  background: var(--paper);
+}
+html::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: 2px solid var(--paper);
+  border-radius: 10px;
+}
+html::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+}
+@media (forced-colors: active) {
+  html { scrollbar-color: auto; }
+}
+
+.notification-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+.notification-toolbar .filter-form {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  padding-bottom: 0;
+}
+.notification-toolbar > form { max-width: 100%; }

@@ -75,6 +75,11 @@ def task_new(request):
                 raise Http404
             if not created:
                 if receipt.task_id:
+                    if any(getattr(receipt.task, field) != form.cleaned_data[field]
+                           for field in ('title', 'discipline', 'due')):
+                        form.add_error(None, 'Эта форма уже отправлена с другими данными. Открой задачу для редактирования или создай новую форму.')
+                        return render(request, 'portal/task_form.html',
+                                      {'nav_section': 'study', 'form': form}, status=409)
                     return redirect(reverse('tasks') + f'#deadline-{receipt.task_id}')
                 messages.info(request, 'Эта задача уже удалена. Для новой задачи открой новую форму.')
                 return redirect('tasks')
@@ -96,12 +101,16 @@ def task_edit(request, pk):
     with transaction.atomic():
         if request.method == 'POST':
             get_user_model().objects.select_for_update().get(pk=request.user.pk)
-        task = get_object_or_404(Deadline, pk=pk, user=request.user)
+        tasks = Deadline.objects.select_for_update() if request.method == 'POST' else Deadline.objects.all()
+        task = get_object_or_404(tasks, pk=pk, user=request.user)
         form = TaskForm(request.POST if request.method == 'POST' else None,
                         instance=task, user=request.user)
         if request.method == 'POST' and form.is_valid():
-            form.save()
-            sync_task_notification(task)
+            if any(field in form.changed_data for field in ('title', 'discipline', 'due')):
+                task = form.save(commit=False)
+                task.save(update_fields=[field for field in ('title', 'discipline', 'due') if field in form.changed_data])
+                task.refresh_from_db()
+                sync_task_notification(task)
             messages.success(request, f'Изменения задачи «{task.title}» сохранены.')
             return redirect(reverse('tasks') + f'#deadline-{task.pk}')
     return render(request, 'portal/task_form.html', {'nav_section': 'study', 'form': form, 'task': task},
