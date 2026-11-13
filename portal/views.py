@@ -14,7 +14,8 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .forms import ClarificationForm, RequestDraftForm, RequestForm
 from .models import Deadline, LearningResult, Lesson, Notification, Profile, RequestDraft, StudentRequest
-from .services import sync_task_notification, lock_request_owner, record_status, save_request_draft
+from .services import (DraftConflict, check_draft_version, set_draft_version, sync_task_notification,
+                       lock_request_owner, record_status, save_request_draft)
 from .experience import view_option
 
 
@@ -188,8 +189,15 @@ def request_new(request):
 def request_review(request):
     draft_form = RequestDraftForm(request.POST, user=request.user)
     if draft_form.is_valid():
-        save_request_draft(request.user, draft_form)
-    form = RequestForm(request.POST, user=request.user)
+        try:
+            draft = save_request_draft(request.user, draft_form)
+        except DraftConflict as conflict:
+            draft_form.add_error(None, str(conflict))
+            return render(request, 'portal/request_form.html', {'nav_section': 'requests', 'form': draft_form,
+                          'draft_conflict': conflict.draft}, status=409)
+        if draft is not None:
+            set_draft_version(draft_form, draft)
+    form = RequestForm(draft_form.data, user=request.user)
     if not form.is_valid():
         return render(request, 'portal/request_form.html', {'nav_section': 'requests', 'form': form}, status=422)
     if request.POST.get('edit') == '1':
@@ -207,6 +215,13 @@ def request_submit(request):
     payload = {k: form.cleaned_data[k] for k in ('kind', 'destination', 'text')}
     with transaction.atomic():
         lock_request_owner(request.user)
+        draft = RequestDraft.objects.filter(user=request.user, idempotency_key=form.idempotency_key).first()
+        try:
+            check_draft_version(draft, form)
+        except DraftConflict as conflict:
+            form.add_error(None, str(conflict))
+            return render(request, 'portal/request_form.html', {'nav_section': 'requests', 'form': form,
+                          'draft_conflict': conflict.draft}, status=409)
         item, created = StudentRequest.objects.get_or_create(idempotency_key=form.idempotency_key,
             defaults={'user': request.user, **payload})
         if item.user_id != request.user.pk:

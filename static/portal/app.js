@@ -36,9 +36,10 @@ document.querySelectorAll('[data-draft-form]').forEach((form) => {
   let revision = 0;
   let savedRevision = 0;
   let leaving = false;
+  let conflicted = false;
 
   const save = () => {
-    if (leaving || inFlight || revision === savedRevision) return;
+    if (leaving || conflicted || inFlight || revision === savedRevision) return;
     const snapshot = revision;
     if (retry) retry.hidden = true;
     status.textContent = 'Сохраняем черновик…';
@@ -51,7 +52,20 @@ document.querySelectorAll('[data-draft-form]').forEach((form) => {
         throw new Error('Сохранение недоступно. Проверь соединение и вход в аккаунт.');
       }
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Не удалось сохранить черновик.');
+      if (!response.ok) {
+        if (result.conflict_url) {
+          conflicted = true;
+          const link = document.createElement('a');
+          link.href = result.conflict_url;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.className = 'text-link';
+          link.textContent = 'Открыть актуальный черновик в новой вкладке';
+          status.after(link);
+        }
+        throw new Error(result.error || 'Не удалось сохранить черновик.');
+      }
+      form.elements.draft_version.value = result.draft_version;
       savedRevision = snapshot;
       const time = new Date(result.updated_at).toLocaleTimeString('ru-RU', {
         hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow',
@@ -59,9 +73,9 @@ document.querySelectorAll('[data-draft-form]').forEach((form) => {
       status.textContent = `Черновик сохранён · ${time} по Москве`;
     }).catch((error) => {
       const message = error instanceof TypeError ? 'Не удалось сохранить черновик. Проверь соединение.' : error.message;
-      status.textContent = message + ' Текст остаётся в форме. Можно сохранить кнопкой ниже.';
+      status.textContent = message + (conflicted ? '' : ' Текст остаётся в форме. Можно сохранить кнопкой ниже.');
       status.classList.add('is-error');
-      if (retry) retry.hidden = false;
+      if (retry) retry.hidden = conflicted;
     }).finally(() => {
       inFlight = null;
       if (!leaving && revision !== snapshot) timer = setTimeout(save, 500);
@@ -73,7 +87,7 @@ document.querySelectorAll('[data-draft-form]').forEach((form) => {
   form.addEventListener('input', (event) => {
     if (!['kind', 'destination', 'text'].includes(event.target.name)) return;
     revision += 1;
-    status.textContent = 'Есть несохранённые изменения…';
+    if (!conflicted) status.textContent = 'Есть несохранённые изменения…';
     clearTimeout(timer);
     timer = setTimeout(save, 700);
   });

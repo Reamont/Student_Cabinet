@@ -8,7 +8,7 @@ from .forms import RequestDraftForm, RequestForm
 from .guidance import student_guides
 from django.db import transaction
 from .models import DeletedDraft, RequestDraft, StudentRequest
-from .services import lock_request_owner, save_request_draft
+from .services import DraftConflict, lock_request_owner, save_request_draft
 from .views import student_required
 
 
@@ -23,14 +23,21 @@ def draft_save(request):
                                  'errors': form.errors.get_json_data()}, status=422)
         return render(request, 'portal/request_form.html', {
             'nav_section': 'requests', 'form': form}, status=422)
-    draft = save_request_draft(request.user, form)
+    try:
+        draft = save_request_draft(request.user, form)
+    except DraftConflict as conflict:
+        if wants_json:
+            return JsonResponse({'error': str(conflict), 'conflict_url': reverse('draft_edit', args=[conflict.draft.idempotency_key])}, status=409)
+        form.add_error(None, str(conflict))
+        return render(request, 'portal/request_form.html', {'nav_section': 'requests', 'form': form,
+                      'draft_conflict': conflict.draft}, status=409)
     if draft is None:
         if wants_json:
             return JsonResponse({'error': 'Эта форма уже отправлена или черновик удалён. Открой новую заявку.'}, status=409)
         messages.info(request, 'Эта форма уже отправлена или черновик удалён. Черновик не создан.')
         return redirect('requests')
     if wants_json:
-        return JsonResponse({'saved': True, 'updated_at': draft.updated_at.isoformat()})
+        return JsonResponse({'saved': True, 'updated_at': draft.updated_at.isoformat(), 'draft_version': draft.updated_at.isoformat()})
     messages.success(request, 'Черновик сохранён. Продолжить можно во вкладке «Черновики» раздела «Заявки».')
     return redirect(reverse('requests') + '?tab=drafts')
 
@@ -42,7 +49,8 @@ def draft_edit(request, key):
     return render(request, 'portal/request_form.html', {
         'nav_section': 'requests', 'draft': draft,
         'form': RequestForm(user=request.user, draft_key=draft.idempotency_key,
-                            initial={k: getattr(draft, k) for k in ('kind', 'destination', 'text')})})
+                            initial={**{k: getattr(draft, k) for k in ('kind', 'destination', 'text')},
+                                     'draft_version': draft.updated_at.isoformat()})})
 
 
 @student_required

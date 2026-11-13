@@ -187,6 +187,25 @@ class RegressionTests(TestCase):
         key, _ = login_keys(request, self.a.username)[0]
         self.assertEqual(LoginThrottle.objects.get(key=key).failures, 1)
 
+    def test_task_edit_does_not_write_stale_completion_state(self):
+        from .task_forms import TaskForm
+        token = self.client.get(reverse('task_edit', args=[self.task.pk])).context['form']['token'].value()
+        original = TaskForm.save
+
+        def concurrent_completion(form, *args, **kwargs):
+            Deadline.objects.filter(pk=self.task.pk).update(done=True)
+            return original(form, *args, **kwargs)
+
+        with patch.object(TaskForm, 'save', concurrent_completion):
+            response = self.client.post(reverse('task_edit', args=[self.task.pk]), {
+                'title': 'Новое название задачи', 'discipline': self.discipline.pk,
+                'due': '2026-11-26T18:00', 'token': token})
+        self.assertEqual(response.status_code, 302)
+        self.task.refresh_from_db()
+        self.assertTrue(self.task.done)
+        self.assertEqual(self.task.title, 'Новое название задачи')
+        self.assertIn('Задача выполнена.', Notification.objects.get(related_deadline=self.task).body)
+
 
 class UpgradeRegressionTests(TransactionTestCase):
     def test_upgrade_preserves_tasks_and_links_notices_and_drops_retired_table(self):

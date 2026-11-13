@@ -9,15 +9,39 @@ def lock_request_owner(user):
     get_user_model().objects.select_for_update().get(pk=user.pk)
 
 
+class DraftConflict(Exception):
+    def __init__(self, draft):
+        self.draft = draft
+        super().__init__('Черновик изменён в другой вкладке. Твой текст сохранён в форме. Скопируй его перед открытием актуальной версии.')
+
+
+def check_draft_version(draft, form):
+    if draft and draft.updated_at.isoformat() != form.cleaned_data.get('draft_version', ''):
+        if any(getattr(draft, field) != form.cleaned_data.get(field, '') for field in ('kind', 'destination', 'text')):
+            raise DraftConflict(draft)
+
+
+def set_draft_version(form, draft):
+    data = form.data.copy()
+    data['draft_version'] = draft.updated_at.isoformat()
+    form.data = data
+
+
 @transaction.atomic
 def save_request_draft(user, form):
     lock_request_owner(user)
     if (StudentRequest.objects.filter(idempotency_key=form.idempotency_key).exists() or
             DeletedDraft.objects.filter(user=user, key=form.idempotency_key).exists()):
         return None
-    draft, _ = RequestDraft.objects.update_or_create(
-        user=user, idempotency_key=form.idempotency_key,
-        defaults={field: form.cleaned_data.get(field, '') for field in ('kind', 'destination', 'text')})
+    draft = RequestDraft.objects.filter(user=user, idempotency_key=form.idempotency_key).first()
+    check_draft_version(draft, form)
+    payload = {field: form.cleaned_data.get(field, '') for field in ('kind', 'destination', 'text')}
+    if draft is None:
+        draft = RequestDraft.objects.create(user=user, idempotency_key=form.idempotency_key, **payload)
+    elif any(getattr(draft, field) != value for field, value in payload.items()):
+        for field, value in payload.items():
+            setattr(draft, field, value)
+        draft.save(update_fields=[*payload, 'updated_at'])
     return draft
 
 
