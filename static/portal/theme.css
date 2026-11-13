@@ -1,0 +1,129 @@
+/* Shared semantic colours for the portal, forms and status indicators. */
+:root {
+  color-scheme: light;
+  --navy: #17282d;
+  --lime: #d6f374;
+  --paper: #f5f6f2;
+  --surface: #fff;
+  --chrome: #f9faf7;
+  --input-bg: #fcfdf9;
+  --ink: #213333;
+  --muted: #5d6b57;
+  --line: #e0e6d9;
+  --accent: #45652a;
+  --accent-line: #9fb77c;
+  --soft-bg: #edf2e5;
+  --hover-bg: #e3edce;
+  --primary-bg: #17282d;
+  --primary-hover: #2c4643;
+  --primary-text: #fff;
+  --highlight-bg: #d6f374;
+  --highlight-ink: #17282d;
+  --highlight-muted: #365332;
+  --highlight-line: #7b9a4538;
+  --info: #3e5775;
+  --info-bg: #e8eef5;
+  --amber: #85571f;
+  --warning-bg: #faf1df;
+  --warning-line: #e9dfc2;
+  --red: #9b3a3a;
+  --danger-bg: #faeeeb;
+  --danger-line: #ecd6cc;
+  --success-bg: #e9f1e4;
+  --success-line: #d1e3c6;
+  --focus: #526fbb;
+  --shadow-color: #17282d10;
+  --shadow: 0 3px 18px #17282d03;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #121c20;
+  --surface: #1c2a2e;
+  --chrome: #182529;
+  --input-bg: #142125;
+  --ink: #e7eee7;
+  --muted: #b0bfae;
+  --line: #36474a;
+  --accent: #c0dc98;
+  --accent-line: #77955e;
+  --soft-bg: #293a30;
+  --hover-bg: #354c39;
+  --primary-bg: #d6f374;
+  --primary-hover: #cbe968;
+  --primary-text: #17282d;
+  --highlight-bg: #334c2a;
+  --highlight-ink: #edf5e6;
+  --highlight-muted: #c4dbb0;
+  --highlight-line: #71945570;
+  --info: #b7cdef;
+  --info-bg: #26384e;
+  --amber: #f1c480;
+  --warning-bg: #403626;
+  --warning-line: #6d5837;
+  --red: #ffb6a5;
+  --danger-bg: #432d2c;
+  --danger-line: #794b44;
+  --success-bg: #2b4030;
+  --success-line: #526e48;
+  --focus: #a4bfff;
+  --shadow-color: #0003;
+  --shadow: 0 3px 18px #0002;
+}
+
+.theme-toggle,
+.password-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.theme-toggle:hover,
+.password-toggle:hover { background: var(--hover-bg); border-color: var(--accent-line); }
+.theme-toggle[hidden], .password-toggle[hidden] { display: none; }
+.theme-sun, [data-theme="dark"] .theme-moon { display: none; }
+[data-theme="dark"] .theme-sun { display: block; }
+.guest-toolbar { display: flex; justify-content: flex-end; padding: 16px 24px; }
+.login-toolbar { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+
+.password-field { position: relative; }
+.field .password-field input:not([type="checkbox"]) { padding-right: 58px; }
+.password-toggle { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); border-color: transparent; background: transparent; }
+.password-hide, .password-toggle[data-visible="true"] .password-show { display: none; }
+.password-toggle[data-visible="true"] .password-hide { display: block; }
+
+@media (max-width: 480px) {
+  .topbar .topbar-title { flex: 1; min-width: 0; }
+  .topbar .topbar-actions { flex-shrink: 0; }
+}
+@media print {
+  .theme-toggle, .guest-toolbar, .login-toolbar, .password-toggle { display: none; }
+  :root[data-theme] {
+    color-scheme: light;
+    --paper: #fff;
+    --surface: #fff;
+    --chrome: #fff;
+    --ink: #17282d;
+    --muted: #43513d;
+    --line: #ccd4c7;
+    --accent: #365321;
+    --soft-bg: #edf2e5;
+    --highlight-bg: #edf2e5;
+    --highlight-ink: #17282d;
+    --highlight-muted: #365332;
+    --info: #3e5775;
+    --info-bg: #e8eef5;
+    --amber: #85571f;
+    --warning-bg: #faf1df;
+    --red: #9b3a3a;
+    --danger-bg: #faeeeb;
+    --success-bg: #e9f1e4;
+  }
+}

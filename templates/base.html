@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#17242a">
   <title>{% block title %}Пульс Кампуса{% endblock %} · РТУ МЕМРЭА</title>
+  <script src="{% static 'portal/theme.js' %}"></script>
+  <link rel="stylesheet" href="{% static 'portal/theme.css' %}">
   <link rel="stylesheet" href="{% static 'portal/app.css' %}">
   <script src="{% static 'portal/app.js' %}" defer></script>
 </head>
@@ -26,6 +28,10 @@
     <symbol id="i-exit" viewBox="0 0 24 24"><path d="M9 4H4v16h5m0-8h12m-5-5 5 5-5 5"/></symbol>
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 13A9 9 0 0 1 11 3.5 9 9 0 1 0 20.5 13Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="m3 3 18 18M10.6 5.1 12 5c6.5 0 10 7 10 7a19 19 0 0 1-3 4M6.2 6.2A21 21 0 0 0 2 12s3.5 7 10 7a11 11 0 0 0 5.8-1.8M10 10a3 3 0 0 0 4 4"/></symbol>
   </defs></svg>
   <a class="skip-link" href="#main">Перейти к содержимому</a>
   {% if user.is_authenticated %}
@@ -45,7 +51,9 @@
   {% endif %}
   <div class="{% if user.is_authenticated %}app-shell{% else %}guest-shell{% endif %}">
     {% if user.is_authenticated %}
-    <header class="topbar"><span class="topbar-title">Личный кабинет <span class="topbar-divider">/</span> <span class="muted">Студент</span></span><div class="topbar-actions"><span class="topbar-date">{{ today|date:'j E Y' }} <span>· Москва</span></span><a class="notification-button {% if unread_count %}has-unread{% endif %}" href="{% url 'notifications' %}" aria-label="Уведомления{% if unread_count %}: непрочитанных {{ unread_count }}{% endif %}"><svg class="icon"><use href="#i-bell"/></svg>{% if unread_count %}<span class="notification-count">{{ unread_count }}</span>{% endif %}</a><a class="profile-button" href="{% url 'profile' %}" aria-label="Открыть профиль"><span aria-hidden="true">{{ profile.full_name|first|default:'С' }}</span></a></div></header>
+    <header class="topbar"><span class="topbar-title">Личный кабинет <span class="topbar-divider">/</span> <span class="muted">Студент</span></span><div class="topbar-actions"><span class="topbar-date">{{ today|date:'j E Y' }} <span>· Москва</span></span>{% include 'portal/_theme_toggle.html' %}<a class="notification-button {% if unread_count %}has-unread{% endif %}" href="{% url 'notifications' %}" aria-label="Уведомления{% if unread_count %}: непрочитанных {{ unread_count }}{% endif %}"><svg class="icon"><use href="#i-bell"/></svg>{% if unread_count %}<span class="notification-count">{{ unread_count }}</span>{% endif %}</a><a class="profile-button" href="{% url 'profile' %}" aria-label="Открыть профиль"><span aria-hidden="true">{{ profile.full_name|first|default:'С' }}</span></a></div></header>
+    {% else %}
+    {% block guest_toolbar %}<div class="guest-toolbar">{% include 'portal/_theme_toggle.html' %}</div>{% endblock %}
     {% endif %}
     <main id="main" class="{% if user.is_authenticated %}main-content{% endif %}" tabindex="-1">
       {% if demo_period %}<div class="demo-period">Демонстрационные данные · {{ demo_period.start|date:'d.m.Y' }} — {{ demo_period.end|date:'d.m.Y' }} · время Москвы{% if demo_period.expired %}<p>Демонстрационный период завершён. Занятия за этот период доступны в расписании.</p><a class="back-link" href="{% url 'schedule' %}?mode=week&amp;date={{ demo_period.start|date:'Y-m-d' }}">Открыть расписание демонстрационного периода →</a>{% endif %}</div>{% endif %}

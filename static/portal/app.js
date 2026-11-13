@@ -1,3 +1,20 @@
+document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+  const input = document.getElementById(button.getAttribute('aria-controls'));
+  if (!input || input.type !== 'password') return;
+  const setVisible = (visible) => {
+    input.type = visible ? 'text' : 'password';
+    button.dataset.visible = String(visible);
+    const label = visible ? 'Скрыть пароль' : 'Показать пароль';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+  };
+  button.hidden = false;
+  button.addEventListener('click', () => setVisible(input.type === 'password'));
+  input.form?.addEventListener('submit', () => setVisible(false));
+  window.addEventListener('pagehide', () => setVisible(false));
+  window.addEventListener('pageshow', () => setVisible(false));
+});
+
 document.querySelectorAll('[data-submit-state]').forEach((form) => {
   form.addEventListener('submit', (event) => {
     if (form.dataset.submitting === 'true') {
