@@ -22,7 +22,7 @@ SHOTS.mkdir(parents=True, exist_ok=True)
 
 def login(page, user='alisa', key='DEMO_STUDENT_PASSWORD'):
     page.goto(BASE + '/login/')
-    page.locator('#id_username').fill(user)
+    page.locator('#id_username').fill(f'{user}@campus.example.test')
     page.locator('#id_password').fill(credentials[key])
     page.get_by_role('button', name='Войти в кабинет').click()
     page.wait_for_load_state('networkidle')

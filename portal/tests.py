@@ -39,8 +39,8 @@ class PortalIntegrationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         User = get_user_model()
-        cls.alisa = User.objects.create_user('alice-test', password=cls.password)
-        cls.boris = User.objects.create_user('boris-test', password=cls.password)
+        cls.alisa = User.objects.create_user('alice-test', email='alice-test@example.test', password=cls.password)
+        cls.boris = User.objects.create_user('boris-test', email='boris-test@example.test', password=cls.password)
         cls.employee = User.objects.create_superuser('staff-test', password=cls.password)
         cls.staff_no_permission = User.objects.create_user('limited-staff', password=cls.password, is_staff=True)
         cls.group_a = Group.objects.create(name='TEST-A')
@@ -79,11 +79,11 @@ class PortalIntegrationTests(TestCase):
 
     def test_valid_and_invalid_login(self):
         self.client.logout()
-        response = self.client.post(reverse('login'), {'username': self.alisa.username, 'password': 'wrong'})
+        response = self.client.post(reverse('login'), {'username': self.alisa.email, 'password': 'wrong'})
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context['form'].errors)
         self.assertNotIn('_auth_user_id', self.client.session)
-        response = self.client.post(reverse('login'), {'username': self.alisa.username, 'password': self.password})
+        response = self.client.post(reverse('login'), {'username': self.alisa.email, 'password': self.password})
         self.assertRedirects(response, reverse('dashboard'))
         self.assertEqual(int(self.client.session['_auth_user_id']), self.alisa.pk)
 
@@ -106,7 +106,7 @@ class PortalIntegrationTests(TestCase):
     def test_safe_next_login_url_cannot_redirect_to_external_site(self):
         self.client.logout()
         response = self.client.post(reverse('login') + '?next=https://attacker.invalid/',
-                                    {'username': self.alisa.username, 'password': self.password})
+                                    {'username': self.alisa.email, 'password': self.password})
         self.assertRedirects(response, reverse('dashboard'))
 
     def test_student_data_cannot_be_selected_by_client_user_id(self):
@@ -263,7 +263,7 @@ class PortalIntegrationTests(TestCase):
 
     def test_csrf_is_required_for_state_changes_and_login(self):
         browser = Client(enforce_csrf_checks=True)
-        response = browser.post(reverse('login'), {'username': self.alisa.username, 'password': self.password})
+        response = browser.post(reverse('login'), {'username': self.alisa.email, 'password': self.password})
         self.assertEqual(response.status_code, 403)
         browser.force_login(self.alisa)
         for name, args, payload in [
@@ -398,7 +398,7 @@ class PortalIntegrationTests(TestCase):
     def test_user_text_is_escaped_and_private_responses_not_cached(self):
         # Client.force_login creates its own bare cookie; inspect a real HTTP login.
         self.client.logout()
-        self.client.post(reverse('login'), {'username': self.alisa.username, 'password': self.password})
+        self.client.post(reverse('login'), {'username': self.alisa.email, 'password': self.password})
         attack = '<script>alert("xss")</script>'
         self.request_a.text = attack
         self.request_a.save(update_fields=['text'])
@@ -414,19 +414,19 @@ class PortalIntegrationTests(TestCase):
         self.client.logout()
         for i in range(10):
             url = reverse('login') if i % 2 == 0 else reverse('admin:login')
-            response = self.client.post(url, {'username': self.alisa.username, 'password': 'incorrect'})
+            response = self.client.post(url, {'username': self.alisa.email, 'password': 'incorrect'})
             self.assertNotEqual(response.status_code, 429)
-        response = self.client.post(reverse('login'), {'username': self.alisa.username, 'password': self.password})
+        response = self.client.post(reverse('login'), {'username': self.alisa.email, 'password': self.password})
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response.headers['Retry-After'], '900')
         LoginThrottle.objects.update(started_at=timezone.now() - timedelta(minutes=16))
-        self.assertEqual(self.client.post(reverse('login'), {'username': self.alisa.username, 'password': self.password}).status_code, 302)
+        self.assertEqual(self.client.post(reverse('login'), {'username': self.alisa.email, 'password': self.password}).status_code, 302)
 
     def test_throttle_by_address_prevents_username_rotation(self):
         self.client.logout()
         LoginThrottle.objects.all().delete()
         for i in range(40):
-            self.assertEqual(self.client.post(reverse('login'), {'username': f'unknown-{i}', 'password': 'wrong'}).status_code, 200)
+            self.assertEqual(self.client.post(reverse('login'), {'username': f'unknown-{i}@example.test', 'password': 'wrong'}).status_code, 200)
         response = self.client.post(reverse('admin:login'), {'username': 'yet-another', 'password': 'wrong'})
         self.assertEqual(response.status_code, 429)
 
@@ -507,16 +507,16 @@ class PortalIntegrationTests(TestCase):
         self.client.logout()
         for i in range(40):
             response = self.client.post(reverse('login'),
-                {'username': f'unknown-{i}', 'password': 'wrong'},
+                {'username': f'unknown-{i}@example.test', 'password': 'wrong'},
                 REMOTE_ADDR='172.18.0.1', HTTP_X_FORWARDED_FOR='192.0.2.1')
             self.assertEqual(response.status_code, 200)
         response = self.client.post(reverse('login'),
-            {'username': self.alisa.username, 'password': self.password},
+            {'username': self.alisa.email, 'password': self.password},
             REMOTE_ADDR='172.18.0.1', HTTP_X_FORWARDED_FOR='192.0.2.2')
         self.assertEqual(response.status_code, 302)
         self.client.logout()
         response = self.client.post(reverse('login'),
-            {'username': self.boris.username, 'password': self.password},
+            {'username': self.boris.email, 'password': self.password},
             REMOTE_ADDR='172.18.0.1', HTTP_X_FORWARDED_FOR='192.0.2.3')
         self.assertEqual(response.status_code, 302)
 
@@ -526,24 +526,24 @@ class PortalIntegrationTests(TestCase):
         for i in range(10):
             url = reverse('login') if i % 2 == 0 else reverse('admin:login')
             response = self.client.post(url,
-                {'username': self.alisa.username, 'password': 'wrong'},
+                {'username': self.alisa.email, 'password': 'wrong'},
                 HTTP_X_FORWARDED_FOR=f'192.0.2.{i}')
             self.assertEqual(response.status_code, 200)
         response = self.client.post(reverse('login'),
-            {'username': self.alisa.username, 'password': self.password})
+            {'username': self.alisa.email, 'password': self.password})
         self.assertEqual(response.status_code, 429)
         response = self.client.post(reverse('login'),
-            {'username': self.boris.username, 'password': self.password})
+            {'username': self.boris.email, 'password': self.password})
         self.assertEqual(response.status_code, 302)
 
     @override_settings(LOGIN_RATE_LIMIT_AT_PROXY=False)
     def test_direct_mode_does_not_trust_spoofed_forwarded_addresses(self):
         self.client.logout()
         for i in range(40):
-            self.client.post(reverse('login'), {'username': f'unknown-{i}', 'password': 'wrong'},
+            self.client.post(reverse('login'), {'username': f'unknown-{i}@example.test', 'password': 'wrong'},
                              HTTP_X_FORWARDED_FOR=f'192.0.2.{i}')
         response = self.client.post(reverse('login'),
-            {'username': self.alisa.username, 'password': self.password},
+            {'username': self.alisa.email, 'password': self.password},
             HTTP_X_FORWARDED_FOR='198.51.100.1')
         self.assertEqual(response.status_code, 429)
 

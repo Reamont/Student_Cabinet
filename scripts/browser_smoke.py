@@ -45,7 +45,7 @@ def watch(page):
 
 def login(page, user, variable, admin=False):
     page.goto(BASE + ('/admin/login/' if admin else '/login/'))
-    page.locator('#id_username').fill(user)
+    page.locator('#id_username').fill(user if admin else f'{user}@campus.example.test')
     page.locator('#id_password').fill(values[variable])
     page.locator('input[type=submit], button[type=submit]').first.click()
     page.wait_for_load_state('networkidle')
@@ -89,7 +89,7 @@ with sync_playwright() as playwright:
     focus = page.evaluate("({tag: document.activeElement.tagName, outline: getComputedStyle(document.activeElement).outlineStyle, width: getComputedStyle(document.activeElement).outlineWidth})")
     assert focus['outline'] != 'none' and focus['width'] != '0px', focus
     record('Клавиатурный фокус виден на странице входа')
-    page.locator('#id_username').fill('alisa')
+    page.locator('#id_username').fill('alisa@campus.example.test')
     page.locator('#id_password').fill('incorrect-browser-check')
     page.get_by_role('button', name='Войти в кабинет').click()
     expect(page.locator('.form-error')).to_be_visible()

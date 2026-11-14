@@ -48,7 +48,7 @@ def failed_login(sender, credentials, request=None, **kwargs):
         return
     now = timezone.now()
     with transaction.atomic():
-        for key, limit in login_keys(request, credentials.get('username', '')):
+        for key, limit in login_keys(request, request.POST.get('username', '')):
             LoginThrottle.objects.get_or_create(key=key)
             row = LoginThrottle.objects.select_for_update().get(key=key)
             if now - row.started_at >= timedelta(minutes=15):

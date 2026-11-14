@@ -21,7 +21,7 @@ for line in (ROOT / 'var/dev.env').read_text().splitlines():
 
 def login(page, username, variable, staff=False):
     page.goto(BASE + ('/admin/login/' if staff else '/login/'))
-    page.locator('#id_username').fill(username)
+    page.locator('#id_username').fill(username if staff else f'{username}@campus.example.test')
     page.locator('#id_password').fill(credentials[variable])
     page.locator('button[type=submit],input[type=submit]').first.click()
     page.wait_for_load_state('networkidle')

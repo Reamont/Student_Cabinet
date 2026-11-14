@@ -19,7 +19,7 @@ PASSWORD = shlex.split(values['DEMO_STUDENT_PASSWORD'])[0]
 
 
 def login(page):
-    page.locator('#id_username').fill('alisa')
+    page.locator('#id_username').fill('alisa@campus.example.test')
     page.locator('#id_password').fill(PASSWORD)
     page.get_by_role('button', name='Войти в кабинет').click()
     page.wait_for_url(BASE + '/')
@@ -69,7 +69,7 @@ with sync_playwright() as p:
         page.screenshot(path=str(SHOTS / f'login-dark-{width}.png'), full_page=True)
 
         # Invalid credentials still show the normal error and reset visibility.
-        page.locator('#id_username').fill('alisa')
+        page.locator('#id_username').fill('alisa@campus.example.test')
         password.fill('incorrect-fictional-password')
         page.get_by_role('button', name='Показать пароль', exact=True).click()
         page.get_by_role('button', name='Войти в кабинет').click()

@@ -83,6 +83,10 @@ class Command(BaseCommand):
         users = []
         for username, variable in accounts:
             user, created = User.objects.get_or_create(username=username)
+            email = f'{username}@campus.example.test'
+            if not user.email and not User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
+                user.email = email
+                user.save(update_fields=['email'])
             if created:
                 user.set_password(os.environ[variable])
                 user.is_staff = username == 'curator'

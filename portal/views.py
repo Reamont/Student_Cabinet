@@ -17,9 +17,11 @@ from .models import Deadline, LearningResult, Lesson, Notification, Profile, Req
 from .services import (DraftConflict, check_draft_version, set_draft_version, sync_task_notification,
                        lock_request_owner, record_status, save_request_draft)
 from .experience import view_option
+from .authentication import EmailAuthenticationForm
 
 
 class StudentLoginView(LoginView):
+    authentication_form = EmailAuthenticationForm
     template_name = 'portal/login.html'
     redirect_authenticated_user = True
 

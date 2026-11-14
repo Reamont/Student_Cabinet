@@ -23,8 +23,8 @@ from .models import Deadline, DemoTaskSeed, Discipline, Group, Notification, Pro
 class RegressionTests(TestCase):
     def setUp(self):
         self.password = 'Test-only-password-827462'
-        self.a = get_user_model().objects.create_user('reg-a', password=self.password)
-        self.b = get_user_model().objects.create_user('reg-b', password=self.password)
+        self.a = get_user_model().objects.create_user('reg-a', email='reg-a@example.test', password=self.password)
+        self.b = get_user_model().objects.create_user('reg-b', email='reg-b@example.test', password=self.password)
         group = Group.objects.create(name='REG-DEMO')
         for u in [self.a, self.b]:
             Profile.objects.create(user=u,group=group,full_name='Демо студент',faculty='Демо',program='Демо',student_number=f'REG-{u.pk}')
@@ -116,22 +116,22 @@ class RegressionTests(TestCase):
         self.client.logout()
         for _ in range(45):
             c=Client()
-            self.assertEqual(c.post(reverse('login'),{'username':self.a.username,'password':self.password}).status_code,302)
+            self.assertEqual(c.post(reverse('login'),{'username':self.a.email,'password':self.password}).status_code,302)
 
     def test_success_resets_account_failures(self):
         self.client.logout()
-        for _ in range(9):self.client.post(reverse('login'),{'username':self.a.username,'password':'bad'})
-        self.assertEqual(self.client.post(reverse('login'),{'username':self.a.username,'password':self.password}).status_code,302)
+        for _ in range(9):self.client.post(reverse('login'),{'username':self.a.email,'password':'bad'})
+        self.assertEqual(self.client.post(reverse('login'),{'username':self.a.email,'password':self.password}).status_code,302)
         self.client.logout()
-        self.assertEqual(self.client.post(reverse('login'),{'username':self.a.username,'password':'bad'}).status_code,200)
+        self.assertEqual(self.client.post(reverse('login'),{'username':self.a.email,'password':'bad'}).status_code,200)
 
     @override_settings(LOGIN_RATE_LIMIT_AT_PROXY=True)
     def test_shared_proxy_and_spoofed_forwarding_do_not_merge_accounts(self):
         self.client.logout()
         for _ in range(10):
-            self.client.post(reverse('login'),{'username':self.a.username,'password':'bad'},REMOTE_ADDR='172.18.0.1')
-        self.assertEqual(self.client.post(reverse('login'),{'username':self.a.username,'password':self.password},HTTP_X_FORWARDED_FOR='203.0.113.3').status_code,429)
-        self.assertEqual(self.client.post(reverse('login'),{'username':self.b.username,'password':self.password},REMOTE_ADDR='172.18.0.1').status_code,302)
+            self.client.post(reverse('login'),{'username':self.a.email,'password':'bad'},REMOTE_ADDR='172.18.0.1')
+        self.assertEqual(self.client.post(reverse('login'),{'username':self.a.email,'password':self.password},HTTP_X_FORWARDED_FOR='203.0.113.3').status_code,429)
+        self.assertEqual(self.client.post(reverse('login'),{'username':self.b.email,'password':self.password},REMOTE_ADDR='172.18.0.1').status_code,302)
 
     def test_nginx_and_compose_keep_trust_boundary(self):
         root=Path(__file__).resolve().parent.parent
@@ -174,7 +174,7 @@ class RegressionTests(TestCase):
         from django.test import RequestFactory
         from .middleware import failed_login, successful_login, login_keys
         from .models import LoginThrottle
-        request = RequestFactory().post('/login/', {'username': self.a.username})
+        request = RequestFactory().post('/login/', {'username': self.a.email})
         original = LoginThrottle.objects.get_or_create
 
         def interleave(*args, **kwargs):
@@ -183,8 +183,8 @@ class RegressionTests(TestCase):
             return result
 
         with patch.object(LoginThrottle.objects, 'get_or_create', side_effect=interleave):
-            failed_login(sender=None, credentials={'username': self.a.username}, request=request)
-        key, _ = login_keys(request, self.a.username)[0]
+            failed_login(sender=None, credentials={'username': self.a.email}, request=request)
+        key, _ = login_keys(request, self.a.email)[0]
         self.assertEqual(LoginThrottle.objects.get(key=key).failures, 1)
 
     def test_task_edit_does_not_write_stale_completion_state(self):

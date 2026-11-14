@@ -19,7 +19,7 @@ fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, 'w') as f:
     f.write('Локальные демонстрационные аккаунты. Не включать в публичный архив.\n')
     for username, key in [('alisa','DEMO_STUDENT_PASSWORD'),('maks','DEMO_SECOND_PASSWORD'),('curator','DEMO_STAFF_PASSWORD')]:
-        f.write(username+': '+values[key]+'\n')
+        f.write(username+'@campus.example.test ('+username+'): '+values[key]+'\n')
 PY
 fi
 set -a
@@ -28,5 +28,5 @@ set +a
 .venv/bin/python manage.py migrate --noinput
 .venv/bin/python manage.py seed_demo
 .venv/bin/python manage.py collectstatic --noinput
-echo 'Local demo accounts: alisa, maks, curator. Private credentials: var/demo-access.txt'
+echo 'Local demo emails: alisa@campus.example.test, maks@campus.example.test, curator@campus.example.test. Private credentials: var/demo-access.txt'
 exec .venv/bin/python manage.py runserver 127.0.0.1:8000 --noreload

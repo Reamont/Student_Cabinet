@@ -26,7 +26,7 @@ SHOTS.mkdir(parents=True, exist_ok=True)
 
 def login(page, user, key, staff=False):
     page.goto(BASE + ('/admin/login/' if staff else '/login/'))
-    page.locator('#id_username').fill(user)
+    page.locator('#id_username').fill(user if staff else f'{user}@campus.example.test')
     page.locator('#id_password').fill(credentials[key])
     page.locator('button[type=submit],input[type=submit]').first.click()
     page.wait_for_load_state('networkidle')

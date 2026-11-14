@@ -12,7 +12,7 @@ with sync_playwright() as p:
         ctx=browser.new_context(viewport={'width':width,'height':800},java_script_enabled=js,reduced_motion='reduce',locale='ru-RU',timezone_id='Europe/Moscow')
         page=ctx.new_page(); errors=[]
         page.on('pageerror',lambda e:errors.append(str(e)))
-        page.goto(base+'/login/');page.locator('#id_username').fill('alisa');page.locator('#id_password').fill(cred['DEMO_STUDENT_PASSWORD']);page.get_by_role('button',name='Войти в кабинет').click()
+        page.goto(base+'/login/');page.locator('#id_username').fill('alisa@campus.example.test');page.locator('#id_password').fill(cred['DEMO_STUDENT_PASSWORD']);page.get_by_role('button',name='Войти в кабинет').click()
         page.goto(base+'/study/tasks/')
         overflow=page.evaluate('document.documentElement.scrollWidth-innerWidth')
         page.screenshot(path=str(root/f'var/task-list-{width}-{js}.png'),full_page=True)

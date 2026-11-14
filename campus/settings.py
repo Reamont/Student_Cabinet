@@ -66,6 +66,7 @@ STORAGES = {'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'
 # Enable only behind the bundled nginx configuration with per-client login limits.
 LOGIN_RATE_LIMIT_AT_PROXY = os.environ.get('LOGIN_RATE_LIMIT_AT_PROXY', '0') == '1'
 LOGIN_URL = 'login'
+AUTHENTICATION_BACKENDS = ['portal.authentication.EmailBackend']
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 SESSION_COOKIE_HTTPONLY = True
