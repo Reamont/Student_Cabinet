@@ -1,0 +1,32 @@
+<footer class="app-footer" aria-labelledby="footer-heading">
+  <div class="footer-inner">
+    <div class="footer-main">
+      <div class="footer-intro">
+        <span class="eyebrow">ПОДДЕРЖКА СТУДЕНТОВ</span>
+        <h2 id="footer-heading">Есть вопросы? Мы рядом.</h2>
+        <p>По вопросам учёбы и работы личного кабинета обратись в деканат.</p>
+      </div>
+      <dl class="footer-contacts">
+        <div class="footer-contact">
+          <dt><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>Телефон</dt>
+          <dd><a class="footer-phone" href="tel:+79999999999">+7 (999) 999-99-99</a></dd>
+        </div>
+        <div class="footer-contact">
+          <dt><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>Время работы</dt>
+          <dd><span class="footer-hours">09:00–21:00</span><span class="footer-note">По московскому времени</span></dd>
+        </div>
+        <div class="footer-contact">
+          <dt><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Адрес</dt>
+          <dd><address>проспект Вернадского, 80<span class="footer-note">Москва, 119454</span></address></dd>
+        </div>
+      </dl>
+    </div>
+    <div class="footer-bottom">
+      <span>Пульс Кампуса <span aria-hidden="true">·</span> Конкурсный прототип</span>
+      <nav aria-label="Полезные ссылки">
+        {% if user.is_authenticated %}<a href="{% url 'student_help' %}">Справочник студента</a>{% endif %}
+        <a href="{% url 'about' %}">О проекте и данных</a>
+      </nav>
+    </div>
+  </div>
+</footer>

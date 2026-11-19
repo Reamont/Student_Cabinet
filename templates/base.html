@@ -22,6 +22,7 @@
     <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M7 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-3l-5-2-2 2a14 14 0 0 1-7-7l2-2Z"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
@@ -60,7 +61,7 @@
       {% if messages %}<div class="messages" aria-live="polite">{% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
       {% block content %}{% endblock %}
     </main>
-    {% if user.is_authenticated %}<footer class="app-footer"><span>Пульс Кампуса · Конкурсный прототип</span><a href="{% url 'student_help' %}">Справочник студента</a><a href="{% url 'about' %}">О проекте и данных</a></footer>{% endif %}
+    {% include 'portal/_footer.html' %}
   </div>
   {% if user.is_authenticated %}
   <nav class="mobile-nav" aria-label="Мобильная навигация">{% include 'portal/_main_links.html' %}</nav>{% endif %}

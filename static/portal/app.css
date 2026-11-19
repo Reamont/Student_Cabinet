@@ -201,3 +201,52 @@ html::-webkit-scrollbar-thumb:hover {
   padding-bottom: 0;
 }
 .notification-toolbar > form { max-width: 100%; }
+
+/* Campus contacts, shared by the login page and the student portal. */
+.app-footer {
+  display: block;
+  max-width: none;
+  margin: 24px 0 0;
+  padding: 36px 40px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+}
+.footer-inner { max-width: 1360px; margin: 0 auto; }
+.footer-main { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(0, 2.3fr); gap: 40px; }
+.footer-intro .eyebrow { margin-bottom: 12px; color: var(--accent); }
+.footer-intro h2 { font-size: 23px; line-height: 1.35; }
+.footer-intro p { max-width: 340px; margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.8; }
+.footer-contacts { display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 24px; margin: 0; }
+.footer-contact { min-width: 0; }
+.footer-contact dt { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
+.footer-contact dt .icon { width: 18px; height: 18px; color: var(--accent); }
+.footer-contact dd { margin: 0; font-size: 15px; line-height: 1.7; }
+.app-footer .footer-phone { min-height: 44px; margin-top: -9px; font-size: 18px; font-weight: 650; white-space: nowrap; }
+.footer-hours { font-size: 18px; font-weight: 650; white-space: nowrap; }
+.footer-note { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.footer-contact address { font-style: normal; }
+.footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 24px; margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.footer-bottom nav { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.app-footer a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
+.guest-shell > .app-footer { margin-top: 0; }
+@media (max-width: 1250px) {
+  .footer-main { grid-template-columns: 1fr; gap: 28px; }
+  .footer-intro p { max-width: 560px; }
+}
+@media (max-width: 1000px) {
+  .app-footer { padding-left: 27px; padding-right: 27px; }
+}
+@media (max-width: 760px) {
+  .app-footer { margin-top: 16px; padding: 28px 22px calc(104px + env(safe-area-inset-bottom)); }
+  .guest-shell > .app-footer { padding-bottom: 24px; }
+}
+@media (max-width: 600px) {
+  .app-footer { padding-left: 17px; padding-right: 17px; }
+  .footer-contacts { grid-template-columns: 1fr; gap: 20px; }
+  .footer-contact + .footer-contact { border-top: 1px solid var(--line); padding-top: 20px; }
+  .footer-contact dt { margin-bottom: 8px; }
+  .footer-bottom { align-items: flex-start; flex-direction: column; margin-top: 24px; gap: 4px; }
+  .footer-bottom nav { gap: 4px 20px; }
+}
